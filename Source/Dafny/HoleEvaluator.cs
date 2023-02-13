@@ -477,7 +477,8 @@ namespace Microsoft.Dafny {
           }
           Console.WriteLine($"constraint expr to be added : {Printer.ExprToString(constraintExpr)}");
         }
-        expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
+        expressionFinder.CalcDepthOneAvailableExpresssionsFromFunctionBody(program, desiredFunction);
+        // expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
         desiredFunctionUnresolved = GetFunctionFromUnresolved(unresolvedProgram, funcName);
         Contract.Assert(desiredFunctionUnresolved != null);
         topLevelDeclCopy = new Function(
@@ -492,6 +493,7 @@ namespace Microsoft.Dafny {
         return false;
       }
       Console.WriteLine($"expressionFinder.availableExpressions.Count == {expressionFinder.availableExpressions.Count}");
+      // Console.WriteLine(expressionFinder.availableExpressions);
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
       // for (int i = 0; i < 1; i++) {
         PrintExprAndCreateProcess(unresolvedProgram, desiredFunctionUnresolved, expressionFinder.availableExpressions[i], i);
@@ -540,11 +542,15 @@ namespace Microsoft.Dafny {
           case Result.Unknown: throw new NotSupportedException();
         }
       }
-      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25} {5, -15} {6, -15}",
-        "InvalidExpr", "IncorrectProof", "FalsePredicate", "CorrectProof", "CorrectProofByTimeout", "NoMatchingTrigger", "Total");
-      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25} {5, -15} {6, -15}",
-        invalidExprCount, incorrectProofCount, falsePredicateCount, correctProofCount, correctProofByTimeoutCount,
-        noMatchingTriggerCount, expressionFinder.availableExpressions.Count);
+      // Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25} {5, -15} {6, -15}",
+      //   "InvalidExpr", "IncorrectProof", "FalsePredicate", "CorrectProof", "CorrectProofByTimeout", "NoMatchingTrigger", "Total");
+      // Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25} {5, -15} {6, -15}",
+      //   invalidExprCount, incorrectProofCount, falsePredicateCount, correctProofCount, correctProofByTimeoutCount,
+      //   noMatchingTriggerCount, expressionFinder.availableExpressions.Count);
+      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15}",
+        "InvalidExpr", "IncorrectProof", "ProofPasses", "Total");
+      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15}",
+        invalidExprCount, incorrectProofCount, falsePredicateCount, expressionFinder.availableExpressions.Count);
       string executionTimesSummary = "";
       // executionTimes.Sort();
       for (int i = 0; i < executionTimes.Count; i++) {
@@ -787,9 +793,11 @@ namespace Microsoft.Dafny {
     public void PrintExprAndCreateProcess(Program program, Function func, Expression expr, int cnt) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine($"{cnt} {Printer.ExprToString(expr)}");
+      // Console.WriteLine("HERE");
       var funcName = func.Name;
 
-      string lemmaForExprValidityString = GetValidityLemma(Paths[0], null, constraintExpr);
+      // string lemmaForExprValidityString = GetValidityLemma(Paths[0], null, constraintExpr);
+      string lemmaForExprValidityString = ""; // remove validityCheck
 
       int lemmaForExprValidityPosition = 0;
       int lemmaForExprValidityStartPosition = 0;
@@ -801,11 +809,13 @@ namespace Microsoft.Dafny {
         using (var wr = new System.IO.StringWriter()) {
           var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
           pr.UniqueStringBeforeUnderscore = UnderscoreStr;
-          if (expr.HasCardinality) {
-            func.Body = Expression.CreateAnd(expr, func.Body);
-          } else {
-            func.Body = Expression.CreateAnd(func.Body, expr);
-          }
+          // if (expr.HasCardinality) {
+          //   func.Body = Expression.CreateAnd(expr, func.Body);
+          // } else {
+          //   func.Body = Expression.CreateAnd(func.Body, expr);
+          // }
+          func.Body = expr; // Replace Whole Body
+          
           pr.PrintProgram(program, true);
           code = $"// #{cnt}\n";
           code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
@@ -823,7 +833,7 @@ namespace Microsoft.Dafny {
             args.Add(arg);
           }
         }
-        args.Add("/exitAfterFirstError");
+        // args.Add("/exitAfterFirstError");
         dafnyVerifier.runDafny(code, args,
             expr, cnt, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition);
       }

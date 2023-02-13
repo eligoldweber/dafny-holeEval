@@ -78,8 +78,11 @@ namespace Microsoft.Dafny {
         }
       }
       holeFinderExecutor.createProcessWithOutput(dafnyBinaryPath,
-          $"{args} {DafnyOptions.O.HoleEvaluatorWorkingDirectory}holeFinder_{funcName}.dfy /exitAfterFirstError",
+          $"{args} {DafnyOptions.O.HoleEvaluatorWorkingDirectory}holeFinder_{funcName}.dfy",
           func, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition, $"holeFinder_{funcName}");
+      // holeFinderExecutor.createProcessWithOutput(dafnyBinaryPath,
+      //     $"{args} {DafnyOptions.O.HoleEvaluatorWorkingDirectory}holeFinder_{funcName}.dfy /exitAfterFirstError",
+      //     func, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition, $"holeFinder_{funcName}");
     }
 
     void PrintCallGraphWithPotentialBugInfo(

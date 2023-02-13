@@ -21,7 +21,7 @@ def verify(stub):
     verification_request.arguments.append('/noNLarith')
     verification_request.arguments.append('/autoTriggers:1')
     verification_request.arguments.append('/verifyAllModules')
-    verification_request.arguments.append('/exitAfterFirstError')
+    # verification_request.arguments.append('/exitAfterFirstError')
     response = stub.Verify(verification_request, timeout=1200)
     print(f"Received response is {response.response}")
 

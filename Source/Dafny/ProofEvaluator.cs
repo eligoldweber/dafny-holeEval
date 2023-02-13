@@ -650,7 +650,7 @@ namespace Microsoft.Dafny {
         }
       }
       // Console.WriteLine($"Creating process : ");
-      args.Add("/exitAfterFirstError");
+      // args.Add("/exitAfterFirstError");
       args.Add("/trace");
       args.Add($"/proc:*{lemma.CompileName}");
       dafnyVerifier.runDafnyProofCheck(code, args, exprList, cnt);

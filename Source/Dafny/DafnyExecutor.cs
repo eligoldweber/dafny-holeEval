@@ -55,6 +55,7 @@ namespace Microsoft.Dafny {
 
     public void startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs(bool runOnlyOnce) {
       // ResizeDafnyOutputList(readyProcesses.Count);
+      Console.WriteLine($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}/output_{inputFileName}_0.txt");
       Parallel.For(0, readyProcesses.Count,
         new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount / 2 },
         i => {
@@ -69,13 +70,13 @@ namespace Microsoft.Dafny {
             var p = readyProcesses[i];
             // Console.WriteLine($"1 {i}");
             p.Close();
-
+    
             File.WriteAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}/output_{inputFileName[p]}_0.txt",
               (processToExpr.ContainsKey(p) ? "// " + Printer.ExprToString(processToExpr[p]) + "\n" : "") +
               "// " + p.StartInfo.Arguments + "\n" + firstOutput + "\n");
 
             var args = p.StartInfo.Arguments.Split(' ');
-            args = args.SkipLast(1).Append("/exitAfterFirstError").ToArray();
+            // args = args.SkipLast(1).Append("/exitAfterFirstError").ToArray();
             // args = args.Append("/exitAfterFirstError");
             p.StartInfo = new ProcessStartInfo(p.StartInfo.FileName, String.Join(' ', args));
             p.StartInfo.RedirectStandardOutput = true;

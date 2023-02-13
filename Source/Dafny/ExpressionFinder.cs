@@ -122,6 +122,13 @@ namespace Microsoft.Dafny {
       yield break;
     }
 
+    public void CalcDepthOneAvailableExpresssionsFromFunctionBody(Program program, Function desiredFunction) {
+      Contract.Requires(desiredFunction != null);
+      Contract.Requires(availableExpressions.Count == 0);
+      var expressions = ListArguments(program, desiredFunction);
+      mutatePredidate(program, desiredFunction, expressions);
+    }
+
     public void CalcDepthOneAvailableExpresssionsFromFunction(Program program, Function desiredFunction) {
       Contract.Requires(desiredFunction != null);
       Contract.Requires(availableExpressions.Count == 0);
@@ -184,6 +191,8 @@ namespace Microsoft.Dafny {
       if (decl is Function) {
         var desiredFunction = decl as Function;
         var equalExprToCheck = desiredFunction.Body;
+        // typeToExpressionDict["bool"].Add( desiredFunction.Body);
+        // Console.WriteLine("BODY = " + Printer.ExprToString(equalExprToCheck));
         foreach (var e in desiredFunction.Req) {
           equalExprToCheck = Expression.CreateAnd(equalExprToCheck, e.E);
         }
@@ -194,6 +203,7 @@ namespace Microsoft.Dafny {
             for (int j = 0; j < typeToExpressionDict[t].Count; j++) {
               if (Printer.ExprToString(typeToExpressionDict[t][j]) == equalExprList[k][i]) {
                 typeToExpressionDict[t].RemoveAt(j);
+                Console.WriteLine("---- "+Printer.ExprToString(typeToExpressionDict[t][j]) );
                 break;
               }
             }
@@ -207,7 +217,136 @@ namespace Microsoft.Dafny {
           }
         }
       }
+      
       return typeToExpressionDict;
+    }
+
+    public void mutatePredidate(Program program, MemberDecl decl, IEnumerable<Expression> expressions){
+      availableExpressions = mutatePredidateHelper(program,decl,expressions);
+    }
+
+    public List<Expression> mutateOneExpression(Program program, MemberDecl decl, Expression e)
+    {
+      List<Expression> currentExperssions = new List<Expression>();
+
+       if(e is BinaryExpr){
+          var be = e as BinaryExpr;
+          var e0 = Printer.ExprToString(be.E0);
+          var e1 = Printer.ExprToString(be.E1);
+          var equalityExpr = Expression.CreateEq(be.E0, be.E1,be.Type);
+          // var neqExpr = Expression.CreateNot(be.E0, be.E1,be.Type);
+          var Or = Expression.CreateOr(be.E0, be.E1,false);
+          var NotE = Expression.CreateNot(be.tok, be);
+          var LessT = Expression.CreateLess(be.E0, be.E1);
+
+          var AtMost = Expression.CreateAtMost(be.E0, be.E1);
+           // Greater Than = !(Lower equal)
+          var gtExpr = Expression.CreateNot(be.tok, Expression.CreateAtMost(be.E0, be.E1));
+          currentExperssions.Add(equalityExpr);
+          // currentExperssions.Add(neqExpr);
+          currentExperssions.Add(Or);
+          currentExperssions.Add(NotE);
+          currentExperssions.Add(LessT);
+          currentExperssions.Add(AtMost);
+          currentExperssions.Add(gtExpr);
+          
+
+       }
+
+      return currentExperssions;
+    }
+    public List<Expression> mutatePredidateHelper(Program program, MemberDecl decl, IEnumerable<Expression> expressions){
+        List<Expression> currentExperssions = new List<Expression>();
+        var desiredFunction = decl as Function;
+        var equalExprToCheck = desiredFunction.Body;
+        Console.WriteLine("NEW -> "+ Printer.ExprToString(equalExprToCheck));
+        var trueExpr = Expression.CreateBoolLiteral(decl.tok, true);
+        var falseExpr = Expression.CreateBoolLiteral(decl.tok, false);
+        currentExperssions.Add(trueExpr);
+        Console.WriteLine("True -> "+ Printer.ExprToString(trueExpr));
+
+        // currentExperssions.Add(falseExpr);
+
+         IEnumerable<Expression> q = TraverseFormal(program,equalExprToCheck);
+         currentExperssions.AddRange(mutateOneExpression(program,decl,q.ElementAt(0)));
+
+        //  foreach (Expression ii in q.ElementAt(0).SubExpressions){
+        //   Console.WriteLine("HERE 0-> "+ Printer.ExprToString(ii));
+        //   Console.WriteLine("Full? -> "+ Printer.ExprToString(q.ElementAt(0)));
+        //   if(q.ElementAt(0) is BinaryExpr){
+        //     Console.WriteLine("Is Bin");
+        //   }
+        //   if(ii is BinaryExpr){
+        //     var be = ii as BinaryExpr;
+        //     var e0 = Printer.ExprToString(be.E0);
+        //     var e1 = Printer.ExprToString(be.E1);
+        //     // currentExperssions = mutateOneExpression(program,decl,be);
+        //                 currentExperssions.AddRange(mutateOneExpression(program,decl,be));
+
+
+        //    }
+        //  }
+        List<Expression> conjuncts = Expression.Conjuncts(equalExprToCheck).ToList();
+          if(conjuncts.Count == 1)
+          {
+            Console.WriteLine("HERE 1-> "+ conjuncts.Count);
+            var be = equalExprToCheck as BinaryExpr;
+            Console.WriteLine("HERE 2-> "+ Printer.ExprToString(be));
+            currentExperssions = mutateOneExpression(program,decl,be);
+
+          }
+         if(conjuncts.Count > 1){
+          for (int i = 0; i < conjuncts.Count; i++) {
+            Console.WriteLine("EXPRESSION To Mutate= " + Printer.ExprToString(conjuncts[i]));
+            // Keep all other expersions the same
+            Expression remainder; 
+            if(i > 0){
+               remainder = conjuncts[0];
+               for (int j = 1; j < conjuncts.Count; j++)
+              {
+                if(j != i){
+                  remainder = Expression.CreateAnd(remainder, conjuncts[j]);
+                }
+              }
+            }else{
+               remainder = conjuncts[1];
+               for (int j = 2; j < conjuncts.Count; j++)
+              {
+                if(j != i){
+                  remainder = Expression.CreateAnd(remainder, conjuncts[j]);
+                }
+            }
+            }
+            // for (int j = 1; j < conjuncts.Count; j++)
+            // {
+            //   if(j != i){
+            //     remainder = Expression.CreateAnd(remainder, conjuncts[j]);
+            //   }
+            // }
+            Console.WriteLine("EXPRESSION To KeepSame = " + Printer.ExprToString(remainder));
+            var be = conjuncts[i] as BinaryExpr;
+            IEnumerable<Expression> exprs = new List<Expression>() {be};
+            
+            List<Expression> mutatedExprs =  mutateOneExpression(program,decl,be);
+            //put mutations back together with remainder
+
+            foreach(Expression e in mutatedExprs)
+            {
+            var allTogether = Expression.CreateAnd(remainder, e);
+            currentExperssions.Add(allTogether);
+            Console.WriteLine("mutated  = " + Printer.ExprToString(allTogether) );
+
+            }
+            // remainder = Expression.CreateAnd(remainder, conjuncts[j]);
+
+            // var lowerThanExpr = Expression.CreateLess(be, be);
+            // currentExperssions.Add(lowerThanExpr);
+
+          }
+         }
+        currentExperssions.Add(trueExpr);
+        currentExperssions.Add(falseExpr);
+        return currentExperssions;
     }
 
     public void CalcDepthOneAvailableExpresssions(Program program, MemberDecl decl, IEnumerable<Expression> expressions) {
@@ -490,6 +629,7 @@ namespace Microsoft.Dafny {
       List<Expression> workingList = new List<Expression>();
       foreach (var expr in ListPredicateInvocations(func, typeToExpressionDict, workingList, 0)) {
         result.Add(expr);
+        // Console.WriteLine("adding : "+ Printer.ExprToString(expr));
       }
       return result;
     }
@@ -717,3 +857,125 @@ namespace Microsoft.Dafny {
     }
   }
 }
+
+
+    // public void CalcDepthOneAvailableExpresssions(Program program, MemberDecl decl, IEnumerable<Expression> expressions) {
+    //   Contract.Requires(availableExpressions.Count == 0);
+    //   Dictionary<string, List<Expression>> typeToExpressionDict = GetRawExpressions(program, decl, expressions, false);
+
+    //   var trueExpr = Expression.CreateBoolLiteral(decl.tok, true);
+    //   availableExpressions.Add(trueExpr);
+    //   foreach (var k in typeToExpressionDict.Keys) {
+    //     Console.WriteLine("HERE " + k);
+    //     var values = typeToExpressionDict[k];
+    //     if (k == "_questionMark_") {
+    //       for (int i = 0; i < values.Count; i++) {
+    //         {
+    //           // No change to the type, add as is
+    //           var expr = values[i];
+    //           availableExpressions.Add(expr);
+    //         }
+    //       }
+    //     } else {
+    //         foreach (Expression e in values){
+    //           Console.WriteLine("EXPRESSION = " + Printer.ExprToString(e));
+    //         }
+    //       for (int i = 0; i < values.Count; i++) {
+    //         for (int j = i + 1; j < values.Count; j++) {
+    //           if (values[i] is LiteralExpr && values[j] is LiteralExpr) {
+    //             continue;
+    //           }
+    //           if (values[i] is ApplySuffix && values[j] is ApplySuffix) {
+    //             continue;
+    //           }
+    //           // Equality
+    //           {
+    //             var equalityExpr = Expression.CreateEq(values[i], values[j], values[i].Type);
+    //             equalityExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             if(j == values.Count-1){
+    //               IEnumerable<Expression> q = TraverseFormal(program,values[j]);
+    //               IEnumerable<Expression> qq = TraverseFormal(program,q.ElementAt(0));
+    //               foreach (Expression e in qq){
+    //                 foreach (Expression ii in e.SubExpressions){
+    //                   if(ii is BinaryExpr){
+    //                     var be = ii as BinaryExpr;
+    //                     var e0 = Printer.ExprToString(be.E0);
+    //                     var e1 = Printer.ExprToString(be.E1);
+    //                   equalityExpr = Expression.CreateEq(be.E0, be.E1, values[i].Type);
+    //                 Console.WriteLine("SUB --> " + e0 + " :: " + e1 + " == " + values[i].Type);
+    //                   }
+    //                 }
+    //                 Console.WriteLine("SUaB --> " + Printer.ExprToString(e));
+          
+    //               }
+    //               // equalityExpr = Expression.CreateEq(values[j][0], values[j][1], values[i].Type);
+    //             }
+    //             Console.WriteLine("EQUAL == (" + j + " ) " +Printer.ExprToString(values[i]) + " :: " +Printer.ExprToString(equalityExpr));
+    //             availableExpressions.Add(equalityExpr);
+    //           }
+    //           if (values[i] is ApplySuffix || values[j] is ApplySuffix) {
+    //             // Console.WriteLine("APPLY SUFFIX == " + typeof(values[j]) + " -- " + typeof(values[i]));
+    //             // continue;
+    //           }
+    //           // Non-Equality
+    //           {
+    //             var neqExpr = Expression.CreateNot(values[i].tok, Expression.CreateEq(values[i], values[j], values[i].Type));
+    //             neqExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             Console.WriteLine("NON-EQUAL == " +Printer.ExprToString(values[i]) + " :: " +Printer.ExprToString(neqExpr));
+
+    //             availableExpressions.Add(neqExpr);
+    //             negateOfExpressionIndex[availableExpressions.Count - 1] = availableExpressions.Count - 2;
+    //             negateOfExpressionIndex[availableExpressions.Count - 2] = availableExpressions.Count - 1;
+    //           }
+    //           if (k == "bool") {
+    //             continue;
+    //           }
+
+    //           // Lower than
+    //           {
+    //             var lowerThanExpr = Expression.CreateLess(values[i], values[j]);
+    //             lowerThanExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             availableExpressions.Add(lowerThanExpr);
+    //           }
+    //           // Greater Equal = !(Lower than)
+    //           {
+    //             var geExpr = Expression.CreateNot(values[i].tok, Expression.CreateLess(values[i], values[j]));
+    //             geExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             availableExpressions.Add(geExpr);
+    //             negateOfExpressionIndex[availableExpressions.Count - 1] = availableExpressions.Count - 2;
+    //             negateOfExpressionIndex[availableExpressions.Count - 2] = availableExpressions.Count - 1;
+    //           }
+    //           // Lower Equal
+    //           {
+    //             var leExpr = Expression.CreateAtMost(values[i], values[j]);
+    //             leExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             availableExpressions.Add(leExpr);
+    //           }
+    //           // Greater Than = !(Lower equal)
+    //           {
+    //             var gtExpr = Expression.CreateNot(values[i].tok, Expression.CreateAtMost(values[i], values[j]));
+    //             gtExpr.HasCardinality = values[i].HasCardinality | values[j].HasCardinality;
+    //             availableExpressions.Add(gtExpr);
+    //             negateOfExpressionIndex[availableExpressions.Count - 1] = availableExpressions.Count - 2;
+    //             negateOfExpressionIndex[availableExpressions.Count - 2] = availableExpressions.Count - 1;
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    //   numberOfSingleExpr = availableExpressions.Count;
+    //   if (DafnyOptions.O.HoleEvaluatorDepth > 1) {
+    //     for (int i = 0; i < numberOfSingleExpr; i++) {
+    //       BitArray bitArray = new BitArray(availableExpressions.Count, false);
+    //       bitArray[i] = true;
+    //       bitArrayList.Add(bitArray);
+    //       if (i == 0) {
+    //         currCombinations.Add(ToBitString(bitArray, false));
+    //         bitArrayStringToIndex[ToBitString(bitArray, false)] = i;
+    //       } else {
+    //         currCombinations.Add(ToBitString(bitArray, true));
+    //         bitArrayStringToIndex[ToBitString(bitArray, true)] = i;
+    //       }
+    //     }
+    //   }
+    // }
