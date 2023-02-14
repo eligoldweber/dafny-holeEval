@@ -87,6 +87,7 @@ namespace Microsoft.Dafny {
         Console.WriteLine(Printer.ExprToString(dafnyVerifier.requestToExpr[request]));
       } else if (response.EndsWith("0 errors\n")) {
         combinationResults[index] = Result.FalsePredicate;
+        Console.WriteLine("Index that Passes = " + index);
       } else if (response.EndsWith($"resolution/type errors detected in {Path.GetFileName(filePath)}\n")) {
         combinationResults[index] = Result.InvalidExpr;
       } else {
@@ -298,6 +299,74 @@ namespace Microsoft.Dafny {
       }
     }
 
+
+   public static string GetBaseLemmaList(Function fn, ModuleDefinition currentModuleDef, Expression constraintExpr) {
+      string res = "";
+      // res += RemoveWhitespace(Printer.FunctionSignatureToString(fn));
+      res += "\n{\n";
+      res += Printer.ExprToString(fn.Body);
+      res += "\n}";
+      // return res;
+
+        using (var wr = new System.IO.StringWriter()) {
+        var pr = new Printer(wr);
+        pr.ModuleForTypes = currentModuleDef;
+        pr.PrintFunction(fn, 0,false);
+        res = wr.ToString();
+      }
+      int i = res.IndexOf("(");
+      String modStr1 = res.Insert(i, "_BASE");
+      return modStr1;
+    }
+
+    public static string GetIsSameLemmaList(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr) {
+      string res = "lemma isSame";
+       foreach (var nwPair in path) {
+        res += "_" + nwPair.Item1.Name;
+      }
+      res += "(";
+      var sep = "";
+      var p = "";
+      foreach (var nwPair in path) {
+        res += sep + " ";
+        sep = "";
+        var x = GetFunctionParamList(nwPair.Item1);
+        res += x.Item2;
+        p += "" + x.Item1; 
+        sep = ", ";
+      }
+      res += ")\n";
+      foreach (var req in path[0].Item1.Req) {
+        res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+      }
+      res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") <==> " + fn.Name+"_BASE("+p+")\n{}";
+      return res;
+    }
+
+    public static string GetIsStronger(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr) {
+      string res = "lemma isStronger";
+       foreach (var nwPair in path) {
+        res += "_" + nwPair.Item1.Name;
+      }
+      res += "(";
+      var sep = "";
+      var p = "";
+      foreach (var nwPair in path) {
+        res += sep + " ";
+        sep = "";
+        var x = GetFunctionParamList(nwPair.Item1);
+        res += x.Item2;
+        p += "" + x.Item1; 
+        sep = ", ";
+      }
+      res += ")\n";
+      foreach (var req in path[0].Item1.Req) {
+        res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+      }
+      res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") ==> " + fn.Name+"_BASE("+p+")\n{}";
+      return res;
+    }
+
     public static string GetValidityLemma(List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr) {
       string res = "lemma {:timeLimitMultiplier 2} validityCheck";
       foreach (var nwPair in path) {
@@ -478,6 +547,7 @@ namespace Microsoft.Dafny {
           Console.WriteLine($"constraint expr to be added : {Printer.ExprToString(constraintExpr)}");
         }
         expressionFinder.CalcDepthOneAvailableExpresssionsFromFunctionBody(program, desiredFunction);
+        // Console.WriteLine(GetBaseLemmaList(baseFunc, null, constraintExpr));
         // expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
         desiredFunctionUnresolved = GetFunctionFromUnresolved(unresolvedProgram, funcName);
         Contract.Assert(desiredFunctionUnresolved != null);
@@ -498,6 +568,7 @@ namespace Microsoft.Dafny {
       // for (int i = 0; i < 1; i++) {
         PrintExprAndCreateProcess(unresolvedProgram, desiredFunctionUnresolved, expressionFinder.availableExpressions[i], i);
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+        // Console.WriteLine("HERE + " + (topLevelDeclCopy.ToString()));
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
       Console.WriteLine("finish");
@@ -798,10 +869,14 @@ namespace Microsoft.Dafny {
 
       // string lemmaForExprValidityString = GetValidityLemma(Paths[0], null, constraintExpr);
       string lemmaForExprValidityString = ""; // remove validityCheck
-
+      string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
+      string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr);
+      string isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr);
+      // Console.WriteLine(isSameLemma);
       int lemmaForExprValidityPosition = 0;
       int lemmaForExprValidityStartPosition = 0;
-
+      int basePredicatePosition = 0;
+      int basePredicateStartPosition = 0;
       var workingDir = $"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}/{funcName}_{cnt}";
       if (tasksList == null)
       {
@@ -819,9 +894,24 @@ namespace Microsoft.Dafny {
           pr.PrintProgram(program, true);
           code = $"// #{cnt}\n";
           code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
-          lemmaForExprValidityStartPosition = code.Count(f => f == '\n') + 1;
-          code += lemmaForExprValidityString + "\n";
-          lemmaForExprValidityPosition = code.Count(f => f == '\n');
+          
+          int fnIndex = code.IndexOf("predicate " + funcName);
+          code = code.Insert(fnIndex-1,basePredicateString+"\n");
+
+          // fnIndex = code.IndexOf("predicate " + funcName);
+          // code = code.Insert(fnIndex-1,isSameLemma+"\n");
+          
+          fnIndex = code.IndexOf("predicate " + funcName);
+          code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
+          // lemmaForExprValidityStartPosition = code.Count(f => f == '\n') + 1;
+          // code += lemmaForExprValidityString + "\n";
+          // lemmaForExprValidityPosition = code.Count(f => f == '\n');
+
+          // basePredicateStartPosition = code.Count(f => f == '\n') + 1;
+          // code += basePredicateString + "\n";
+          // basePredicatePosition = code.Count(f => f == '\n');
+
+          // Console.WriteLine(code.IndexOf("lemma isSame_"+funcName));
           if (DafnyOptions.O.HoleEvaluatorCreateAuxFiles)
             File.WriteAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}{funcName}_{cnt}.dfy", code);
         }

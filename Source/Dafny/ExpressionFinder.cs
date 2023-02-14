@@ -233,22 +233,34 @@ namespace Microsoft.Dafny {
           var be = e as BinaryExpr;
           var e0 = Printer.ExprToString(be.E0);
           var e1 = Printer.ExprToString(be.E1);
+          //Equal
           var equalityExpr = Expression.CreateEq(be.E0, be.E1,be.Type);
-          // var neqExpr = Expression.CreateNot(be.E0, be.E1,be.Type);
+          // OR = (a || b)
           var Or = Expression.CreateOr(be.E0, be.E1,false);
+          // AND = (a && b)
+          var And = Expression.CreateAnd(be.E0, be.E1,false);
+          // Not Equal = !(E)
           var NotE = Expression.CreateNot(be.tok, be);
+          //Implies
+          var impliesE = Expression.CreateImplies(be.E0, be.E1);
+          // Lower than
           var LessT = Expression.CreateLess(be.E0, be.E1);
-
+          // Lower Equal
           var AtMost = Expression.CreateAtMost(be.E0, be.E1);
-           // Greater Than = !(Lower equal)
+          // Greater Than = !(Lower equal)
           var gtExpr = Expression.CreateNot(be.tok, Expression.CreateAtMost(be.E0, be.E1));
+          // Greater Equal = !(Lower than)
+          var geExpr = Expression.CreateNot(be.tok, Expression.CreateLess(be.E0, be.E1));
+          
           currentExperssions.Add(equalityExpr);
-          // currentExperssions.Add(neqExpr);
           currentExperssions.Add(Or);
+          currentExperssions.Add(And);
           currentExperssions.Add(NotE);
+          currentExperssions.Add(equalityExpr);
           currentExperssions.Add(LessT);
           currentExperssions.Add(AtMost);
           currentExperssions.Add(gtExpr);
+          currentExperssions.Add(geExpr);
           
 
        }
@@ -259,13 +271,9 @@ namespace Microsoft.Dafny {
         List<Expression> currentExperssions = new List<Expression>();
         var desiredFunction = decl as Function;
         var equalExprToCheck = desiredFunction.Body;
-        Console.WriteLine("NEW -> "+ Printer.ExprToString(equalExprToCheck));
+        Console.WriteLine("Full Expresion -> "+ Printer.ExprToString(equalExprToCheck));
         var trueExpr = Expression.CreateBoolLiteral(decl.tok, true);
         var falseExpr = Expression.CreateBoolLiteral(decl.tok, false);
-        currentExperssions.Add(trueExpr);
-        Console.WriteLine("True -> "+ Printer.ExprToString(trueExpr));
-
-        // currentExperssions.Add(falseExpr);
 
          IEnumerable<Expression> q = TraverseFormal(program,equalExprToCheck);
          currentExperssions.AddRange(mutateOneExpression(program,decl,q.ElementAt(0)));
