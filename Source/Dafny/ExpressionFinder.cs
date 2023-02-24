@@ -341,6 +341,10 @@ namespace Microsoft.Dafny {
             foreach(Expression e in mutatedExprs)
             {
             var allTogether = Expression.CreateAnd(remainder, e);
+            if(Printer.ExprToString(allTogether) == Printer.ExprToString(equalExprToCheck)){
+                // Console.WriteLine("SAME CHECK  = " + Printer.ExprToString(allTogether) );
+
+            }
             currentExperssions.Add(allTogether);
             Console.WriteLine("mutated  = " + Printer.ExprToString(allTogether) );
 

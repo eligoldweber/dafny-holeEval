@@ -143,7 +143,11 @@ namespace Microsoft.Dafny {
       foreach (var arg in args) {
         request.Arguments.Add(arg);
       }
+      if(requestsList.ContainsKey(cnt)){
+      requestsList[cnt] = request;
+      }else{
       requestsList.Add(cnt, request);
+      }
       var serverId = cnt % serversList.Count;
       AsyncUnaryCall<VerificationResponse> task = serversList[serverId].VerifyAsync(request,
         deadline: DateTime.UtcNow.AddMinutes(30000));
