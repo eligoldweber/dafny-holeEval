@@ -327,12 +327,21 @@ namespace Microsoft.Dafny {
             DafnyOptions.O.HoleEvaluatorDepth);
         return foundDesiredLemma.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
       }
-      if (DafnyOptions.O.HoleEvaluatorFunctionName != null) {
+      if (DafnyOptions.O.HoleEvaluatorFunctionName != null && DafnyOptions.O.ProofLemmaName != null) {
         var holeEvaluator = new HoleEvaluator();
-        var foundDesiredFunction = holeEvaluator.EvaluateNEW(dafnyProgram,
+        var foundDesiredFunction = holeEvaluator.EvaluateFilterStrongerAndSame(dafnyProgram,
             dafnyUnresolvedProgram,
             DafnyOptions.O.HoleEvaluatorFunctionName,
             DafnyOptions.O.ProofLemmaName,
+            DafnyOptions.O.HoleEvaluatorBaseFunctionName,
+            DafnyOptions.O.HoleEvaluatorDepth);
+        return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
+      }
+      if (DafnyOptions.O.HoleEvaluatorFunctionName != null) {
+        var holeEvaluator = new HoleEvaluator();
+        var foundDesiredFunction = holeEvaluator.Evaluate(dafnyProgram,
+            dafnyUnresolvedProgram,
+            DafnyOptions.O.HoleEvaluatorFunctionName,
             DafnyOptions.O.HoleEvaluatorBaseFunctionName,
             DafnyOptions.O.HoleEvaluatorDepth);
         return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;

@@ -87,7 +87,7 @@ namespace Microsoft.Dafny {
         Console.WriteLine(Printer.ExprToString(dafnyVerifier.requestToExpr[request]));
       } else if (response.EndsWith("0 errors\n")) {
         combinationResults[index] = Result.FalsePredicate;
-        Console.WriteLine("Index that Passes = " + index);
+        Console.WriteLine("Mutation that Passes = " + index);
       } else if (response.EndsWith($"resolution/type errors detected in {Path.GetFileName(filePath)}\n")) {
         combinationResults[index] = Result.InvalidExpr;
       } else {
@@ -471,7 +471,7 @@ namespace Microsoft.Dafny {
       }
       return null;
     }
-public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, string funcName, string lemmaName,string baseFuncName, int depth) {
+public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName,string baseFuncName, int depth) {
       if (DafnyOptions.O.HoleEvaluatorServerIpPortList == null) {
         Console.WriteLine("ip port list is not given. Please specify with /holeEvalServerIpPortList");
         return false;
@@ -501,13 +501,6 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
       if (baseLemma == null) {
         return false;
       }
-              Console.WriteLine("-------");
-        using (var wr = new System.IO.StringWriter()) {
-          var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
-          pr.PrintMethod(baseLemma, 0, false);
-          Console.WriteLine(Printer.ToStringWithoutNewline(wr));
-        }
-        Console.WriteLine("-------");
 
       if (baseFunc == null) {
         Console.WriteLine($"couldn't find function {baseFuncName}. List of all functions:");
@@ -598,46 +591,27 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
       // for (int i = 0; i < 1; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
-        //                Console.WriteLine("------- " + i);
-        // using (var wr = new System.IO.StringWriter()) {
-        //   var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
-        //   pr.PrintFunction(desiredFunctionUnresolved, 0, false);
-        //   Console.WriteLine(Printer.ToStringWithoutNewline(wr));
-        // }
-        // Console.WriteLine("-------" + i);
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,false);
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,false,false);
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
 
-      // Console.WriteLine("lengeth = " + dafnyVerifier.requestsList.Count + " :: " + i);
-      var request = dafnyVerifier.requestsList[i];
-      var position = dafnyVerifier.requestToPostConditionPosition[request];
-      var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-      var output = dafnyVerifier.dafnyOutput[request];
-      var response = output.Response;
-      var filePath = output.FileName;
-      var startTime = output.StartTime;
-      var execTime = output.ExecutionTime;
-      executionTimes.Add(execTime);
-      startTimes.Add(startTime);
-      var expectedOutput =
-        $"{filePath}({position},0): Error: A postcondition might not hold on this return path.";
-      var expectedInconclusiveOutputStart =
-        $"{filePath}({lemmaStartPosition},{validityLemmaNameStartCol}): Verification inconclusive";
-      // Console.WriteLine($"{index} => {output}");
-      // Console.WriteLine($"{output.EndsWith("0 errors\n")} {output.EndsWith($"resolution/type errors detected in {fileName}.dfy\n")}");
-      // Console.WriteLine($"----------------------------------------------------------------");
-      var res = DafnyVerifierClient.IsCorrectOutput(response, expectedOutput, expectedInconclusiveOutputStart);
-      if(response.EndsWith("0 errors\n")){
-        // Console.WriteLine("Passed Stronger Test on (" + i + ")! Trying EQUAL");
-        // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,true);
-        // await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        
-        Console.WriteLine("Passed Stronger Test on (" + i + ")! Trying Full Proof");
-        PrintExprAndCreateProcess(unresolvedProgram, desiredFunctionUnresolved,expressionFinder.availableExpressions[i], i);
+     var isStronger = isDafnyVerifySuccessful(i);
+      if(isStronger){
+        Console.WriteLine("Passed Stronger Test on (" + i + ")! Trying isSame");
+        desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,false,true);
+        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+        var isSame = isDafnyVerifySuccessful(i);
+        desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+
+        if(!isSame){
+          Console.WriteLine("Passed Stronger Test AND Same Test on (" + i + ")! Trying Full Proof");
+          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,expressionFinder.availableExpressions[i], i,true,false);
+        }else{
+          var request = dafnyVerifier.requestsList[i];
+          dafnyVerifier.dafnyOutput[request].Response = "isSame";
+        }
       }
-      // Console.WriteLine("HERE " + res + " " + response + ":: " + response.EndsWith("0 errors\n"));
-        // Console.WriteLine("HERE + " + (topLevelDeclCopy.ToString()));
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
       Console.WriteLine("finish");
@@ -781,7 +755,25 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
     }
 
 
-
+  public Boolean isDafnyVerifySuccessful(int i)
+  {
+    var request = dafnyVerifier.requestsList[i];
+      var position = dafnyVerifier.requestToPostConditionPosition[request];
+      var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
+      var output = dafnyVerifier.dafnyOutput[request];
+      var response = output.Response;
+      var filePath = output.FileName;
+      var startTime = output.StartTime;
+      var execTime = output.ExecutionTime;
+      executionTimes.Add(execTime);
+      startTimes.Add(startTime);
+      var expectedOutput =
+        $"{filePath}({position},0): Error: A postcondition might not hold on this return path.";
+      var expectedInconclusiveOutputStart =
+        $"{filePath}({lemmaStartPosition},{validityLemmaNameStartCol}): Verification inconclusive";
+      var res = DafnyVerifierClient.IsCorrectOutput(response, expectedOutput, expectedInconclusiveOutputStart);
+      return response.EndsWith("0 errors\n");
+  }
 
 
 
@@ -1223,11 +1215,9 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
 
     public void PrintExprAndCreateProcess(Program program, Function func, Expression expr, int cnt) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
-      Console.WriteLine($"{cnt} {Printer.ExprToString(expr)}");
-      // Console.WriteLine("HERE");
+      Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
 
-      // string lemmaForExprValidityString = GetValidityLemma(Paths[0], null, constraintExpr);
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
       string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr);
@@ -1319,18 +1309,16 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
       }
     }
 
-    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,Expression expr, int cnt, bool isSame) {
+    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,Expression expr, int cnt, bool includeProof, bool isSame) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
-      Console.WriteLine($"{cnt} {Printer.ExprToString(expr)}");
-      // Console.WriteLine("HERE");
+      Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
 
-      // string lemmaForExprValidityString = GetValidityLemma(Paths[0], null, constraintExpr);
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
       string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr);
       string isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr);
-      // Console.WriteLine(isSameLemma);
+
       int lemmaForExprValidityPosition = 0;
       int lemmaForExprValidityStartPosition = 0;
       int basePredicatePosition = 0;
@@ -1357,13 +1345,17 @@ public async Task<bool> EvaluateNEW(Program program, Program unresolvedProgram, 
           int fnIndex = code.IndexOf("predicate " + funcName);
           code = code.Insert(fnIndex-1,basePredicateString+"\n");
           
+          if(!includeProof){
           //Comment out 'proof'
           int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
           code = code.Insert(lemmaLoc-1,"/*"+"\n");
           code = code.Insert(code.IndexOf("\n\n",lemmaLoc)-1,"*/"+"\n");
+          }
 
-          // fnIndex = code.IndexOf("predicate " + funcName);
-          // code = code.Insert(fnIndex-1,isSameLemma+"\n");
+          if(isSame){
+            fnIndex = code.IndexOf("predicate " + funcName);
+            code = code.Insert(fnIndex-1,isSameLemma+"\n");
+          }
           
           fnIndex = code.IndexOf("predicate " + funcName);
           code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
