@@ -357,6 +357,7 @@ namespace Microsoft.Dafny {
         var x = GetFunctionParamList(nwPair.Item1);
         res += x.Item2;
         p += "" + x.Item1; 
+        // Console.WriteLine("PARAMs = " + x);
         sep = ", ";
       }
       res += ")\n";
@@ -538,6 +539,14 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       Function desiredFunctionUnresolved = null;
       Function topLevelDeclCopy = null;
       desiredFunction = GetFunction(program, funcName);
+      Console.WriteLine("--Function to Mutate--");
+      using (var wr = new System.IO.StringWriter()) {
+        var pr = new Printer(wr);
+        pr.PrintFunction(desiredFunction, 0,false);
+        Console.WriteLine(wr.ToString());
+      }
+      Console.WriteLine("--------------");
+
       if (desiredFunction != null) {
         includeParser = new IncludeParser(program);
         var filename = includeParser.Normalized(desiredFunction.BodyStartTok.Filename);
@@ -1146,7 +1155,8 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       string paramNames = "";
       var sep = "";
       foreach (var param in func.Formals) {
-        parameterNameTypes += sep + namePrefix + param.Name + ":" + GetFullTypeString(func.EnclosingClass.EnclosingModuleDefinition, param.Type);
+        // parameterNameTypes += sep + namePrefix + param.Name + ":" + GetFullTypeString(func.EnclosingClass.EnclosingModuleDefinition, param.Type);
+        parameterNameTypes += sep + namePrefix + param.Name + ":" + GetFullTypeString(null, param.Type);
         paramNames += sep + namePrefix + param.Name;
         sep = ", ";
       }

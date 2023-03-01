@@ -237,8 +237,16 @@ namespace Microsoft.Dafny {
           var equalityExpr = Expression.CreateEq(be.E0, be.E1,be.Type);
           // OR = (a || b)
           var Or = Expression.CreateOr(be.E0, be.E1,false);
+          // Not A OR = (!a || b)
+          var OrNotA = Expression.CreateOr(Expression.CreateNot(be.tok, be.E0), be.E1,false);
+          // Not B OR = (a || !b)
+          var OrNotB = Expression.CreateOr(be.E0,Expression.CreateNot(be.tok, be.E1),false);
           // AND = (a && b)
           var And = Expression.CreateAnd(be.E0, be.E1,false);
+          // Not A AND = (!a && b)
+          var AndNotA = Expression.CreateAnd(Expression.CreateNot(be.tok, be.E0), be.E1,false);
+          // Not B AND = (a && !b)
+          var AndNotB = Expression.CreateAnd(be.E0,Expression.CreateNot(be.tok, be.E1),false);
           // Not Equal = !(E)
           var NotE = Expression.CreateNot(be.tok, be);
           //Implies
@@ -254,7 +262,13 @@ namespace Microsoft.Dafny {
           
           currentExperssions.Add(equalityExpr);
           currentExperssions.Add(Or);
+          currentExperssions.Add(OrNotA);
+          currentExperssions.Add(OrNotB);
+
           currentExperssions.Add(And);
+          currentExperssions.Add(AndNotA);
+          currentExperssions.Add(AndNotB);
+
           currentExperssions.Add(NotE);
           currentExperssions.Add(equalityExpr);
           currentExperssions.Add(LessT);
