@@ -472,7 +472,11 @@ namespace Microsoft.Dafny {
       }
       return null;
     }
-public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName,string baseFuncName, int depth) {
+public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName, string proofModuleName, string baseFuncName, int depth) {
+      if(proofModuleName != null)
+      {
+        // Console.WriteLine("MOUDLE = " + proofModuleName);
+      }
       if (DafnyOptions.O.HoleEvaluatorServerIpPortList == null) {
         Console.WriteLine("ip port list is not given. Please specify with /holeEvalServerIpPortList");
         return false;
@@ -600,7 +604,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       // for (int i = 0; i < 1; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,false,false);
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false);
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
 
      var isStronger = isDafnyVerifySuccessful(i);
@@ -608,14 +612,14 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine("Passed Stronger Test on (" + i + ")! Trying isSame");
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,expressionFinder.availableExpressions[i], i,false,true);
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true);
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
         var isSame = isDafnyVerifySuccessful(i);
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
         if(!isSame){
           Console.WriteLine("Passed Stronger Test AND Same Test on (" + i + ")! Trying Full Proof");
-          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,expressionFinder.availableExpressions[i], i,true,false);
+          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false);
         }else{
           var request = dafnyVerifier.requestsList[i];
           dafnyVerifier.dafnyOutput[request].Response = "isSame";
@@ -1319,7 +1323,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
     }
 
-    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,Expression expr, int cnt, bool includeProof, bool isSame) {
+    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof, bool isSame) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
@@ -1356,10 +1360,17 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           code = code.Insert(fnIndex-1,basePredicateString+"\n");
           
           if(!includeProof){
-          //Comment out 'proof'
-          int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
-          code = code.Insert(lemmaLoc-1,"/*"+"\n");
-          code = code.Insert(code.IndexOf("\n\n",lemmaLoc)-1,"*/"+"\n");
+            if(moduleName != null){
+              // comment out entire module "assume this is last module"! 
+              int moduleLoc = code.IndexOf("module " +moduleName);
+              code = code.Insert(moduleLoc-1,"/*"+"\n");
+              code = code + "/*";
+            }else{
+              //Comment out single 'proof' lemma
+              int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+              code = code.Insert(lemmaLoc-1,"/*"+"\n");
+              code = code.Insert(code.IndexOf("\n\n",lemmaLoc)-1,"*/"+"\n");
+            }
           }
 
           if(isSame){

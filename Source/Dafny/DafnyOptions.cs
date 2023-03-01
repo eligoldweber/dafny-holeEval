@@ -186,6 +186,7 @@ namespace Microsoft.Dafny {
     public string ProofEvaluatorLemmaName = null;
     public string HoleEvaluatorFunctionName = null;
     public string ProofLemmaName = null;
+    public string ProofModuleName = null;
     public string HoleEvaluatorBaseFunctionName = null;
     public int HoleEvaluatorDepth = 1;
     public bool HoleEvaluatorRunOnce = false;
@@ -663,6 +664,11 @@ namespace Microsoft.Dafny {
         case "proofName":
           if (ps.ConfirmArgumentCount(1)) {
             ProofLemmaName = args[ps.i];
+          }
+          return true;
+        case "proofModuleName":
+          if (ps.ConfirmArgumentCount(1)) {
+            ProofModuleName = args[ps.i];
           }
           return true;
         case "holeEvalBase":
