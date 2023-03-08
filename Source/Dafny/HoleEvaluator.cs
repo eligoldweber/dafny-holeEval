@@ -85,7 +85,7 @@ namespace Microsoft.Dafny {
         combinationResults[index] = res;
         // Console.WriteLine(p.StartInfo.Arguments);
         Console.WriteLine(Printer.ExprToString(dafnyVerifier.requestToExpr[request]));
-      } else if (response.EndsWith("0 errors\n")) {
+      } else if (response.EndsWith(" 0 errors\n")) {
         combinationResults[index] = Result.FalsePredicate;
         Console.WriteLine("Mutation that Passes = " + index);
       } else if (response.EndsWith($"resolution/type errors detected in {Path.GetFileName(filePath)}\n")) {
@@ -299,6 +299,14 @@ namespace Microsoft.Dafny {
       }
     }
 
+    public static string GetNonPrefixedString(Expression expr, ModuleDefinition currentModuleDef) {
+      using (var wr = new System.IO.StringWriter()) {
+        var pr = new Printer(wr);
+        pr.ModuleForTypes = currentModuleDef;
+        pr.PrintExpression(expr, false);
+        return wr.ToString();
+      }
+    }
 
    public static string GetBaseLemmaList(Function fn, ModuleDefinition currentModuleDef, Expression constraintExpr) {
       string res = "";
@@ -319,7 +327,7 @@ namespace Microsoft.Dafny {
       return modStr1;
     }
 
-    public static string GetIsSameLemmaList(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr) {
+    public static string GetIsSameLemmaList(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr,Boolean isQuantifier) {
       string res = "lemma isSame";
        foreach (var nwPair in path) {
         res += "_" + nwPair.Item1.Name;
@@ -327,23 +335,33 @@ namespace Microsoft.Dafny {
       res += "(";
       var sep = "";
       var p = "";
+       Tuple<string, string> x = new Tuple<string, string>(null, null);
       foreach (var nwPair in path) {
         res += sep + " ";
         sep = "";
-        var x = GetFunctionParamList(nwPair.Item1);
+        x = GetFunctionParamList(nwPair.Item1);
         res += x.Item2;
         p += "" + x.Item1; 
         sep = ", ";
       }
       res += ")\n";
       foreach (var req in path[0].Item1.Req) {
-        res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+       if(isQuantifier){
+          res += "  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }else{
+          res += "  requires " + GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }
       }
-      res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") <==> " + fn.Name+"_BASE("+p+")\n{}";
+       if(p != ""){
+        res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") <==> " + fn.Name+"_BASE("+p+")\n{}";
+       }else{
+              res += "  ensures " + fn.Name+ "() <==> " + fn.Name+"_BASE()\n{}";
+
+       }
       return res;
     }
 
-    public static string GetIsStronger(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr) {
+    public static string GetIsStronger(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr, Boolean isQuantifier) {
       string res = "lemma isStronger";
        foreach (var nwPair in path) {
         res += "_" + nwPair.Item1.Name;
@@ -351,20 +369,32 @@ namespace Microsoft.Dafny {
       res += "(";
       var sep = "";
       var p = "";
+      Tuple<string, string> x = new Tuple<string, string>(null, null);
+
       foreach (var nwPair in path) {
         res += sep + " ";
         sep = "";
-        var x = GetFunctionParamList(nwPair.Item1);
+        x = GetFunctionParamList(nwPair.Item1);
         res += x.Item2;
         p += "" + x.Item1; 
-        // Console.WriteLine("PARAMs = " + x);
         sep = ", ";
       }
       res += ")\n";
       foreach (var req in path[0].Item1.Req) {
-        res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+        // Console.WriteLine("  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n");
+        // res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+        if(isQuantifier){
+          res += "  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }else{
+          res += "  requires " + GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }
       }
-      res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") ==> " + fn.Name+"_BASE("+p+")\n{}";
+      if(p != ""){
+        res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") ==> " + fn.Name+"_BASE("+p+")\n{}";
+      }else{
+        res += "  ensures " + fn.Name+ "() ==> " + fn.Name+"_BASE()\n{}";
+
+      }
       return res;
     }
 
@@ -454,6 +484,22 @@ namespace Microsoft.Dafny {
       }
       return false;
     }
+
+    public void PrintAllLemmas(Program program, string lemmaName) {
+      foreach (var kvp in program.ModuleSigs) {
+        foreach (var d in kvp.Value.ModuleDef.TopLevelDecls) {
+          var cl = d as TopLevelDeclWithMembers;
+          if (cl != null) {
+            foreach (var member in cl.Members) {
+              var m = member as Lemma;
+              if (m != null) {
+                Console.WriteLine("LEMMA NAME = " + m.FullDafnyName);
+              }
+            }
+          }
+        }
+      }
+    }
     public static Lemma GetLemma(Program program, string lemmaName) {
       foreach (var kvp in program.ModuleSigs) {
         foreach (var d in kvp.Value.ModuleDef.TopLevelDecls) {
@@ -502,10 +548,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         baseFuncName = funcName;
       }
       Function baseFunc = GetFunction(program, baseFuncName);
-      Lemma baseLemma = GetLemma(program, lemmaName);
-      if (baseLemma == null) {
-        return false;
-      }
+
 
       if (baseFunc == null) {
         Console.WriteLine($"couldn't find function {baseFuncName}. List of all functions:");
@@ -516,6 +559,13 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         }
         return false;
       }
+      Lemma baseLemma = GetLemma(program, lemmaName);
+      if (baseLemma == null) {
+        Console.WriteLine($"couldn't find function {lemmaName}. List of all lemmas:");
+        PrintAllLemmas(program, lemmaName);
+        return false;
+      }
+
       Function constraintFunc = null;
       if (DafnyOptions.O.HoleEvaluatorConstraint != null) {
         constraintFunc = GetFunction(program, DafnyOptions.O.HoleEvaluatorConstraint);
@@ -543,13 +593,13 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       Function desiredFunctionUnresolved = null;
       Function topLevelDeclCopy = null;
       desiredFunction = GetFunction(program, funcName);
-      Console.WriteLine("--Function to Mutate--");
-      using (var wr = new System.IO.StringWriter()) {
-        var pr = new Printer(wr);
-        pr.PrintFunction(desiredFunction, 0,false);
-        Console.WriteLine(wr.ToString());
-      }
-      Console.WriteLine("--------------");
+      // Console.WriteLine("--Function to Mutate--");
+      // using (var wr = new System.IO.StringWriter()) {
+      //   var pr = new Printer(wr);
+      //   pr.PrintFunction(desiredFunction, 0,false);
+      //   Console.WriteLine(wr.ToString());
+      // }
+      // Console.WriteLine("--------------");
 
       if (desiredFunction != null) {
         includeParser = new IncludeParser(program);
@@ -584,9 +634,21 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         expressionFinder.CalcDepthOneAvailableExpresssionsFromFunctionBody(program, desiredFunction);
         // Console.WriteLine(GetBaseLemmaList(baseFunc, null, constraintExpr));
         // expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
-        desiredFunctionUnresolved = GetFunctionFromUnresolved(unresolvedProgram, funcName);
-       
+        desiredFunctionUnresolved = GetFunctionFromUnresolvedClass(unresolvedProgram, funcName);
+        // Console.WriteLine("BEFORE");
+        if(desiredFunctionUnresolved == null){
+          desiredFunctionUnresolved = GetFunction(program, funcName);
+        }
+      //         Console.WriteLine("--Function to Mutate--");
+      // using (var wr = new System.IO.StringWriter()) {
+      //   var pr = new Printer(wr);
+      //   pr.PrintFunction(desiredFunction, 0,false);
+      //   Console.WriteLine(wr.ToString());
+      // }
+      // Console.WriteLine("--------------");
         Contract.Assert(desiredFunctionUnresolved != null);
+        
+        // Console.WriteLine("AFTER");
         topLevelDeclCopy = new Function(
           desiredFunctionUnresolved.tok, desiredFunctionUnresolved.Name, desiredFunctionUnresolved.HasStaticKeyword,
           desiredFunctionUnresolved.IsGhost, desiredFunctionUnresolved.TypeArgs, desiredFunctionUnresolved.Formals,
@@ -637,20 +699,20 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
 
       // Until here, we only check depth 1 of expressions.
       // Now we try to check next depths
-      int numberOfSingleExpr = expressionFinder.availableExpressions.Count;
-      for (int dd = 2; dd <= depth; dd++) {
-        var prevDepthExprStartIndex = expressionFinder.availableExpressions.Count;
-        expressionFinder.CalcNextDepthAvailableExpressions();
-        for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
-          var expr = expressionFinder.availableExpressions[i];
-          PrintExprAndCreateProcess(program, desiredFunction, expr, i);
-          desiredFunction.Body = topLevelDeclCopy.Body;
-        }
-        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
-          UpdateCombinationResult(i);
-        }
-      }
+      // int numberOfSingleExpr = expressionFinder.availableExpressions.Count;
+      // for (int dd = 2; dd <= depth; dd++) {
+      //   var prevDepthExprStartIndex = expressionFinder.availableExpressions.Count;
+      //   expressionFinder.CalcNextDepthAvailableExpressions();
+      //   for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
+      //     var expr = expressionFinder.availableExpressions[i];
+      //     PrintExprAndCreateProcess(program, desiredFunction, expr, i);
+      //     desiredFunction.Body = topLevelDeclCopy.Body;
+      //   }
+      //   await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+      //   for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
+      //     UpdateCombinationResult(i);
+      //   }
+      // }
       Console.WriteLine($"{dafnyVerifier.sw.ElapsedMilliseconds / 1000}:: finish exploring, try to calculate implies graph");
       int correctProofCount = 0;
       int correctProofByTimeoutCount = 0;
@@ -890,6 +952,9 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         // Console.WriteLine(GetBaseLemmaList(baseFunc, null, constraintExpr));
         // expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
         desiredFunctionUnresolved = GetFunctionFromUnresolved(unresolvedProgram, funcName);
+        if(desiredFunctionUnresolved == null){
+          desiredFunctionUnresolved = desiredFunction;
+        }
         Contract.Assert(desiredFunctionUnresolved != null);
         topLevelDeclCopy = new Function(
           desiredFunctionUnresolved.tok, desiredFunctionUnresolved.Name, desiredFunctionUnresolved.HasStaticKeyword,
@@ -1183,6 +1248,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         if (topLevelDecl is ClassDecl) {
           var cd = topLevelDecl as ClassDecl;
           foreach (var member in cd.Members) {
+            // Console.WriteLine($"{cd.FullDafnyName}.{member.Name}");
             if ($"{cd.FullDafnyName}.{member.Name}" == funcName) {
               return member as Function;
             }
@@ -1194,6 +1260,21 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
 
     public static Function GetFunctionFromUnresolved(Program program, string funcName) {
       int index = funcName.LastIndexOf('.');
+      string moduleName = funcName.Remove(index);
+      foreach (var topLevelDecl in program.DefaultModuleDef.TopLevelDecls) {
+        if(topLevelDecl.FullDafnyName == moduleName) {
+          var lmd = topLevelDecl as LiteralModuleDecl;
+          var func = GetFunctionFromModuleDef(lmd.ModuleDef, funcName);
+          if (func != null) {
+            return func;
+          }
+        }
+      }
+      return null;
+    }
+
+    public static Function GetFunctionFromUnresolvedClass(Program program, string funcName) {
+      int index = funcName.IndexOf('.');
       string moduleName = funcName.Remove(index);
       foreach (var topLevelDecl in program.DefaultModuleDef.TopLevelDecls) {
         if(topLevelDecl.FullDafnyName == moduleName) {
@@ -1234,8 +1315,8 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
 
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
-      string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr);
-      string isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr);
+      string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,false);
+      string isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,false);
       // Console.WriteLine(isSameLemma);
       int lemmaForExprValidityPosition = 0;
       int lemmaForExprValidityStartPosition = 0;
@@ -1254,7 +1335,6 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           //   func.Body = Expression.CreateAnd(func.Body, expr);
           // }
           func.Body = expr; // Replace Whole Body
-          
           pr.PrintProgram(program, true);
           code = $"// #{cnt}\n";
           code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
@@ -1330,8 +1410,16 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
 
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
-      string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr);
-      string isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr);
+      string isSameLemma = "";
+      string isStrongerLemma = "";
+
+      if(expr is QuantifierExpr){
+        isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,true);
+        isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,true);
+      }else{
+        isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,false);
+        isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,false);
+      }
 
       int lemmaForExprValidityPosition = 0;
       int lemmaForExprValidityStartPosition = 0;
@@ -1351,14 +1439,19 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           // }
           func.Body = expr; // Replace Whole Body
           // lemma.Body = new Block;
-          
+      //     Console.WriteLine("--Function is Mutated--");
+      // using (var wr1 = new System.IO.StringWriter()) {
+      //   var pr1 = new Printer(wr);
+      //   pr1.PrintFunction(func, 0,false);
+      //   Console.WriteLine(wr1.ToString());
+      // }
+      // Console.WriteLine("--------------");
           pr.PrintProgram(program, true);
           code = $"// #{cnt}\n";
           code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
           
           int fnIndex = code.IndexOf("predicate " + funcName);
           code = code.Insert(fnIndex-1,basePredicateString+"\n");
-          
           if(!includeProof){
             if(moduleName != null){
               // comment out entire module "assume this is last module"! 
@@ -1369,7 +1462,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
               //Comment out single 'proof' lemma
               int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
               code = code.Insert(lemmaLoc-1,"/*"+"\n");
-              code = code.Insert(code.IndexOf("\n\n",lemmaLoc)-1,"*/"+"\n");
+              code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
             }
           }
 
@@ -1380,6 +1473,8 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           
           fnIndex = code.IndexOf("predicate " + funcName);
           code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
+
+
           // lemmaForExprValidityStartPosition = code.Count(f => f == '\n') + 1;
           // code += lemmaForExprValidityString + "\n";
           // lemmaForExprValidityPosition = code.Count(f => f == '\n');
