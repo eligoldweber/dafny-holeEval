@@ -290,7 +290,7 @@ namespace Microsoft.Dafny {
     public List<Expression> getMutatedExprs(Program program, Function decl, BinaryExpr expression){
       List<Expression> currentExperssions = new List<Expression>();
       Console.WriteLine("Full Expresion -> "+ Printer.ExprToString(expression));
-      Console.WriteLine("Expresion type = " + expression);
+      // Console.WriteLine("Expresion type = " + expression);
       var trueExpr = Expression.CreateBoolLiteral(decl.tok, true);
       var falseExpr = Expression.CreateBoolLiteral(decl.tok, false);
       IEnumerable<Expression> q = TraverseFormal(program,expression);
