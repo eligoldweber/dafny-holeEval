@@ -353,14 +353,50 @@ namespace Microsoft.Dafny {
         }
       }
        if(p != ""){
-        res += "  ensures forall " + p + " :: "+ fn.Name+ "("+p+") <==> " + fn.Name+"_BASE("+p+")\n{}";
+        res += "  ensures forall " + p + " :: "+ fn.Name+ "_BASE("+p+") <==> " + fn.Name+"("+p+")\n{}";
        }else{
-              res += "  ensures " + fn.Name+ "() <==> " + fn.Name+"_BASE()\n{}";
-
+              res += "  ensures " + fn.Name+ "_BASE() <==> " + fn.Name+"()\n{}";
        }
       return res;
     }
 
+    public static string GetIsWeaker(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr, Boolean isQuantifier) {
+      string res = "lemma isAtLeastWeaker";
+       foreach (var nwPair in path) {
+        res += "_" + nwPair.Item1.Name;
+      }
+      res += "(";
+      var sep = "";
+      var p = "";
+      Tuple<string, string> x = new Tuple<string, string>(null, null);
+
+      foreach (var nwPair in path) {
+        res += sep + " ";
+        sep = "";
+        x = GetFunctionParamList(nwPair.Item1);
+        res += x.Item2;
+        p += "" + x.Item1; 
+        sep = ", ";
+      }
+      res += ")\n";
+      foreach (var req in path[0].Item1.Req) {
+        // Console.WriteLine("  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n");
+        // res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+        if(isQuantifier){
+          res += "  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }else{
+          res += "  requires " + GetNonPrefixedString(req.E, currentModuleDef) + "\n";
+        }
+      }
+      if(p != ""){
+        res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
+
+      }else{
+        res += "  ensures " + fn.Name+"_BASE() ==> " + fn.Name+"()\n{}";
+
+      }
+      return res;
+    }
     public static string GetIsStronger(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr, Boolean isQuantifier) {
       string res = "lemma isStronger";
        foreach (var nwPair in path) {
@@ -666,27 +702,30 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       // for (int i = 0; i < 1; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false);
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
 
      var isStronger = isDafnyVerifySuccessful(i);
-      if(isStronger){
-        Console.WriteLine("Passed Stronger Test on (" + i + ")! Trying isSame");
+      if(!isStronger){
+        Console.WriteLine("Passed is Not At Least as Weak Test on (" + i + ")! Trying isSame ");
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true);
+        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
         var isSame = isDafnyVerifySuccessful(i);
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
 
         if(!isSame){
-          Console.WriteLine("Passed Stronger Test AND Same Test on (" + i + ")! Trying Full Proof");
-          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false);
+          Console.WriteLine("Passed Not Weaker Test on (" + i + ")! Trying Full Proof");
+          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
         }else{
           var request = dafnyVerifier.requestsList[i];
           dafnyVerifier.dafnyOutput[request].Response = "isSame";
         }
-      }
+      }else{
+          var request = dafnyVerifier.requestsList[i];
+          dafnyVerifier.dafnyOutput[request].Response = "isWeaker";
+        }
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
       Console.WriteLine("finish");
@@ -1403,7 +1442,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
     }
 
-    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof, bool isSame) {
+    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool isSame) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
@@ -1412,12 +1451,15 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
       string isSameLemma = "";
       string isStrongerLemma = "";
+      string istWeakerLemma = "";
 
       if(expr is QuantifierExpr){
         isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,true);
+        istWeakerLemma = GetIsWeaker(func,Paths[0], null, constraintExpr,true);
         isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,true);
       }else{
         isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,false);
+        istWeakerLemma = GetIsWeaker(func,Paths[0], null, constraintExpr,false);
         isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,false);
       }
 
@@ -1465,14 +1507,17 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
               code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
             }
           }
-
+          if(isWeaker){
+            fnIndex = code.IndexOf("predicate " + funcName);
+            code = code.Insert(fnIndex-1,istWeakerLemma+"\n");
+          }
           if(isSame){
             fnIndex = code.IndexOf("predicate " + funcName);
             code = code.Insert(fnIndex-1,isSameLemma+"\n");
           }
           
-          fnIndex = code.IndexOf("predicate " + funcName);
-          code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
+          // fnIndex = code.IndexOf("predicate " + funcName);
+          // code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
 
 
           // lemmaForExprValidityStartPosition = code.Count(f => f == '\n') + 1;
