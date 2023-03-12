@@ -222,7 +222,10 @@ namespace Microsoft.Dafny {
     }
 
     public void mutatePredidate(Program program, MemberDecl decl, IEnumerable<Expression> expressions){
-      availableExpressions = mutatePredidateHelper(program,decl,expressions);
+      foreach (Expression e in mutatePredidateHelper(program,decl,expressions)){
+        availableExpressions.Add(e);
+      }
+      // availableExpressions = mutatePredidateHelper(program,decl,expressions);
     }
 
     public List<Expression> mutateOneExpression(Program program, MemberDecl decl, Expression e)
@@ -388,7 +391,7 @@ namespace Microsoft.Dafny {
     }
 
     public void CalcDepthOneAvailableExpresssions(Program program, MemberDecl decl, IEnumerable<Expression> expressions) {
-      Contract.Requires(availableExpressions.Count == 0);
+      // Contract.Requires(availableExpressions.Count == 0);
       Dictionary<string, List<Expression>> typeToExpressionDict = GetRawExpressions(program, decl, expressions, false);
 
       var trueExpr = Expression.CreateBoolLiteral(decl.tok, true);

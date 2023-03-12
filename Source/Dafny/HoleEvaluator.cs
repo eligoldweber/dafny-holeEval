@@ -554,11 +554,12 @@ namespace Microsoft.Dafny {
       }
       return null;
     }
-public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName, string proofModuleName, string baseFuncName, int depth) {
+public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName, string proofModuleName, string baseFuncName, int depth, bool mutationsFromParams) {
       if(proofModuleName != null)
       {
         // Console.WriteLine("MOUDLE = " + proofModuleName);
       }
+      Console.WriteLine("mutationsFromParams = " + mutationsFromParams);
       if (DafnyOptions.O.HoleEvaluatorServerIpPortList == null) {
         Console.WriteLine("ip port list is not given. Please specify with /holeEvalServerIpPortList");
         return false;
@@ -669,6 +670,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         }
         expressionFinder.CalcDepthOneAvailableExpresssionsFromFunctionBody(program, desiredFunction);
         // Console.WriteLine(GetBaseLemmaList(baseFunc, null, constraintExpr));
+
         // expressionFinder.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
         desiredFunctionUnresolved = GetFunctionFromUnresolvedClass(unresolvedProgram, funcName);
         // Console.WriteLine("BEFORE");
@@ -696,6 +698,16 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine($"{funcName} was not found!");
         return false;
       }
+      if(mutationsFromParams){
+        ExpressionFinder expressionFindeTest = new ExpressionFinder(this);
+        expressionFindeTest.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
+        for (int i = 0; i < expressionFindeTest.availableExpressions.Count; i++) {
+          Expression simpleAdditiveMutation = Expression.CreateAnd(expressionFindeTest.availableExpressions[i], desiredFunctionUnresolved.Body);
+          Console.WriteLine("mutated = " +  Printer.ExprToString(simpleAdditiveMutation));
+          expressionFinder.availableExpressions.Add(simpleAdditiveMutation);
+        }
+      }
+      //
       Console.WriteLine($"expressionFinder.availableExpressions.Count == {expressionFinder.availableExpressions.Count}");
       // Console.WriteLine(expressionFinder.availableExpressions);
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
@@ -740,8 +752,9 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       // Now we try to check next depths
       // int numberOfSingleExpr = expressionFinder.availableExpressions.Count;
       // for (int dd = 2; dd <= depth; dd++) {
-      //   var prevDepthExprStartIndex = expressionFinder.availableExpressions.Count;
-      //   expressionFinder.CalcNextDepthAvailableExpressions();
+        var prevDepthExprStartIndex = expressionFinder.availableExpressions.Count;
+        expressionFinder.CalcNextDepthAvailableExpressions();
+        Console.WriteLine("DEPTH = " + expressionFinder.availableExpressions.Count + " :: " + prevDepthExprStartIndex);
       //   for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
       //     var expr = expressionFinder.availableExpressions[i];
       //     PrintExprAndCreateProcess(program, desiredFunction, expr, i);
@@ -1351,7 +1364,6 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
-
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
       string isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,false);
@@ -1446,6 +1458,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
+      // Console.WriteLine("ELI TEST ==> " +Printer.ExprToString(func.Body) );
 
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);

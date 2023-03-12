@@ -337,7 +337,8 @@ namespace Microsoft.Dafny {
             DafnyOptions.O.ProofLemmaName,
             DafnyOptions.O.ProofModuleName,
             DafnyOptions.O.HoleEvaluatorBaseFunctionName,
-            DafnyOptions.O.HoleEvaluatorDepth);
+            DafnyOptions.O.HoleEvaluatorDepth,
+            DafnyOptions.O.MutationsFromParams);
         return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
       }
       if (DafnyOptions.O.HoleEvaluatorFunctionName != null && DafnyOptions.O.ProofLemmaName != null) {
@@ -348,7 +349,8 @@ namespace Microsoft.Dafny {
             DafnyOptions.O.ProofLemmaName,
             null,
             DafnyOptions.O.HoleEvaluatorBaseFunctionName,
-            DafnyOptions.O.HoleEvaluatorDepth);
+            DafnyOptions.O.HoleEvaluatorDepth,
+            DafnyOptions.O.MutationsFromParams);
         return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
       }
       if (DafnyOptions.O.HoleEvaluatorFunctionName != null) {
