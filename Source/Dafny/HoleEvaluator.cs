@@ -564,6 +564,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine("ip port list is not given. Please specify with /holeEvalServerIpPortList");
         return false;
       }
+      Console.WriteLine(DafnyOptions.O.HoleEvaluatorServerIpPortList);
       if (DafnyOptions.O.HoleEvaluatorCommands != null) {
         var input = File.ReadAllText(DafnyOptions.O.HoleEvaluatorCommands);
         tasksList = Google.Protobuf.JsonParser.Default.Parse<TasksList>(input);
@@ -698,63 +699,141 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine($"{funcName} was not found!");
         return false;
       }
+      int initialCount = expressionFinder.availableExpressions.Count;
+      ExpressionFinder expressionFindeTest = new ExpressionFinder(this);
       if(mutationsFromParams){
-        ExpressionFinder expressionFindeTest = new ExpressionFinder(this);
         expressionFindeTest.CalcDepthOneAvailableExpresssionsFromFunction(program, desiredFunction);
         for (int i = 0; i < expressionFindeTest.availableExpressions.Count; i++) {
           Expression simpleAdditiveMutation = Expression.CreateAnd(expressionFindeTest.availableExpressions[i], desiredFunctionUnresolved.Body);
           Console.WriteLine("mutated = " +  Printer.ExprToString(simpleAdditiveMutation));
           expressionFinder.availableExpressions.Add(simpleAdditiveMutation);
         }
+                foreach (Expression e in expressionFindeTest.availableExpressions){
+          // Console.WriteLine(" >> " + Printer.ExprToString(e));
+        }
+                int comboCount = 0;
+
+        if(depth > 1 ){
+        for(int i = 1; i < expressionFindeTest.availableExpressions.Count;i++){
+          for(int j = 2; j < expressionFindeTest.availableExpressions.Count;j++){
+            if(i != j){
+              var exprA = expressionFindeTest.availableExpressions[i];
+              var exprB = expressionFindeTest.availableExpressions[j];
+              var conjunctExpr = Expression.CreateAnd(exprA, exprB);
+              var disjunctExpr = Expression.CreateOr(exprA, exprB);
+              // Console.WriteLine("Combo ("+ i +","+ j + ") " + Printer.ExprToString(conjunctExpr));
+              // Console.WriteLine("Combo ("+ i +","+ j + ") " + Printer.ExprToString(disjunctExpr));
+              
+              Expression disjunctDepth2 = Expression.CreateAnd(disjunctExpr, desiredFunctionUnresolved.Body);
+              Console.WriteLine("mutated = " +  Printer.ExprToString(disjunctDepth2));
+              expressionFinder.availableExpressions.Add(disjunctDepth2);
+              Expression conjunctDepth2 = Expression.CreateAnd(conjunctExpr, desiredFunctionUnresolved.Body);
+              Console.WriteLine("mutated = " +  Printer.ExprToString(conjunctDepth2));
+              expressionFinder.availableExpressions.Add(conjunctDepth2);
+              comboCount = comboCount + 2;
+            }
+          }
+        }
       }
+        Console.WriteLine("Combo Count = " + comboCount);
+      }//116
       //
-      Console.WriteLine($"expressionFinder.availableExpressions.Count == {expressionFinder.availableExpressions.Count}");
-      // Console.WriteLine(expressionFinder.availableExpressions);
+      int remainingVal = expressionFinder.availableExpressions.Count;
+      Console.WriteLine("--- Begin Is At Least Weaker Pass -- " + remainingVal);
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
-      // for (int i = 0; i < 1; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-
         PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
-        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-
-     var isStronger = isDafnyVerifySuccessful(i);
-      if(!isStronger){
-        Console.WriteLine("Passed is Not At Least as Weak Test on (" + i + ")! Trying isSame ");
-        desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
-        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        var isSame = isDafnyVerifySuccessful(i);
-        desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-
-        if(!isSame){
-          Console.WriteLine("Passed Not Weaker Test on (" + i + ")! Trying Full Proof");
-          PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
-        }else{
-          var request = dafnyVerifier.requestsList[i];
-          dafnyVerifier.dafnyOutput[request].Response = "isSame";
-        }
-      }else{
-          var request = dafnyVerifier.requestsList[i];
-          dafnyVerifier.dafnyOutput[request].Response = "isWeaker";
-        }
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-      Console.WriteLine("finish");
-
-      // bool foundCorrectExpr = false;
+      Console.WriteLine("--- END Is At Least Weaker Pass -- ");
+      Console.WriteLine("--- START Is Same Pass -- " + remainingVal);
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
-        UpdateCombinationResult(i);
-        // foundCorrectExpr |= combinationResults[i] == Result.CorrectProof;
+        var isWeaker = isDafnyVerifySuccessful(i);
+        var resolutionError = isResolutionError(i);
+      // Console.WriteLine("is Succesful? (" + i + ") " + resolutionError);
+
+        if(!isWeaker && !resolutionError){
+            // Console.WriteLine("is Succesful? (" + i + ")");
+            desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+            PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
+        }else{
+          remainingVal = remainingVal - 1;
+          Console.WriteLine("Failed Afer 1st PASS  + " + i + " :: " + !isWeaker + " :: " + !resolutionError);
+          // var request = dafnyVerifier.requestsList[i];
+          // dafnyVerifier.dafnyOutput[request].Response = "isWeaker";
+        }
       }
+        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:" + remainingVal);
+
+        for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+          var isSame = isDafnyVerifySuccessful(i);  
+          var resolutionError = isResolutionError(i);
+          // Console.WriteLine("----THIRD PASS " + i + " :: " + !isSame);
+          if(!isSame && !resolutionError){
+            desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+            PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+          }else{
+            remainingVal = remainingVal - 1;
+            var request = dafnyVerifier.requestsList[i];
+            dafnyVerifier.dafnyOutput[request].Response = "isSame";
+          }
+        }
+                await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:" + remainingVal);
+        for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+                UpdateCombinationResult(i);
+        }
+    // return;
+      Console.WriteLine($"expressionFinder.availableExpressions.Count == {expressionFinder.availableExpressions.Count}");
+      // Console.WriteLine(expressionFinder.availableExpressions);
+    //   for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+    //   // for (int i = 0; i < 1; i++) {
+    //     desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+
+    //     PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+    //     await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+
+    //  var isStronger = isDafnyVerifySuccessful(i);
+    //   if(!isStronger){
+    //     Console.WriteLine("Passed is Not At Least as Weak Test on (" + i + ")! Trying isSame ");
+    //     desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+
+    //     PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
+    //     await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+    //     var isSame = isDafnyVerifySuccessful(i);
+    //     desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+
+    //     if(!isSame){
+    //       Console.WriteLine("Passed Not Weaker Test on (" + i + ")! Trying Full Proof");
+    //       PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+    //     }else{
+    //       var request = dafnyVerifier.requestsList[i];
+    //       dafnyVerifier.dafnyOutput[request].Response = "isSame";
+    //     }
+    //   }else{
+    //       var request = dafnyVerifier.requestsList[i];
+    //       dafnyVerifier.dafnyOutput[request].Response = "isWeaker";
+    //     }
+    //   }
+    //   await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+    //   Console.WriteLine("finish");
+
+    //   // bool foundCorrectExpr = false;
+    //   for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+    //     UpdateCombinationResult(i);
+    //     // foundCorrectExpr |= combinationResults[i] == Result.CorrectProof;
+    //   }
 
       // Until here, we only check depth 1 of expressions.
       // Now we try to check next depths
       // int numberOfSingleExpr = expressionFinder.availableExpressions.Count;
       // for (int dd = 2; dd <= depth; dd++) {
-        var prevDepthExprStartIndex = expressionFinder.availableExpressions.Count;
-        expressionFinder.CalcNextDepthAvailableExpressions();
-        Console.WriteLine("DEPTH = " + expressionFinder.availableExpressions.Count + " :: " + prevDepthExprStartIndex);
+
+        // var prevDepthExprStartIndex = expressionFindeTest.availableExpressions.Count;
+        // expressionFinder.CalcNextDepthAvailableExpressions();
+        // Console.WriteLine(expressionFinder.combinationResults.Count);
+        // Console.WriteLine("DEPTH = " + expressionFindeTest.availableExpressions.Count + " :: " + prevDepthExprStartIndex);
       //   for (int i = prevDepthExprStartIndex; i < expressionFinder.availableExpressions.Count; i++) {
       //     var expr = expressionFinder.availableExpressions[i];
       //     PrintExprAndCreateProcess(program, desiredFunction, expr, i);
@@ -902,11 +981,20 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       return response.EndsWith("0 errors\n");
   }
 
-
-
-
-
-
+  public Boolean isResolutionError(int i)
+  {
+    var request = dafnyVerifier.requestsList[i];
+      var position = dafnyVerifier.requestToPostConditionPosition[request];
+      var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
+      var output = dafnyVerifier.dafnyOutput[request];
+      var response = output.Response;
+      var filePath = output.FileName;
+      var startTime = output.StartTime;
+      var execTime = output.ExecutionTime;
+      executionTimes.Add(execTime);
+      startTimes.Add(startTime);
+      return response.Contains("resolution/type errors") || response.Contains("Error: arguments");
+  }
 
     public async Task<bool> Evaluate(Program program, Program unresolvedProgram, string funcName, string baseFuncName, int depth) {
       if (DafnyOptions.O.HoleEvaluatorServerIpPortList == null) {

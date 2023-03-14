@@ -61,12 +61,14 @@ namespace Microsoft.Dafny {
     }
 
     public bool IsGoodExprCombinationToExecute(int indexI, int indexJ) {
-      Contract.Requires(indexI >= 0 && indexI < availableExpressions.Count);
-      Contract.Requires(indexJ >= 0 && indexJ < availableExpressions.Count);
+      // Contract.Requires(indexI >= 0 && indexI < availableExpressions.Count);
+      // Contract.Requires(indexJ >= 0 && indexJ < availableExpressions.Count);
+      Console.WriteLine("Size = " + combinationResults.Count + " :: i = " + indexI + " , " + combinationResults[indexI] + " :: j = " + indexJ + " , " + combinationResults[indexJ]);
       if ((!HoleEvaluator.IsGoodResult(combinationResults[indexI])) ||
           (!HoleEvaluator.IsGoodResult(combinationResults[indexJ]))) {
         return false;
       }
+      Console.WriteLine("after? ( " + indexI + "," + indexJ + ")");
       BitArray combinedBitArray = new BitArray(bitArrayList[indexI]);
       combinedBitArray.Or(bitArrayList[indexJ]);
 
@@ -149,6 +151,7 @@ namespace Microsoft.Dafny {
       foreach (var expr in expressionList) {
         var exprString = Printer.ExprToString(expr);
         var typeString = expr.Type.ToString();
+        // Console.WriteLine("HERE " + exprString + " :: " + typeString);
         // Console.WriteLine($"{c,2} {exprString,-20} {typeString}");
         if (expr.Type == Type.Bool && exprString[exprString.Length - 1] == '?') {
           typeString = "_questionMark_";
@@ -470,15 +473,19 @@ namespace Microsoft.Dafny {
       }
       numberOfSingleExpr = availableExpressions.Count;
       if (DafnyOptions.O.HoleEvaluatorDepth > 1) {
+        // Console.WriteLine("!!!!! == " + DafnyOptions.O.HoleEvaluatorDepth);
         for (int i = 0; i < numberOfSingleExpr; i++) {
           BitArray bitArray = new BitArray(availableExpressions.Count, false);
           bitArray[i] = true;
           bitArrayList.Add(bitArray);
           if (i == 0) {
             currCombinations.Add(ToBitString(bitArray, false));
+            // Console.WriteLine("Curr Combo = " + i + " :: " + ToBitString(bitArray, false));
             bitArrayStringToIndex[ToBitString(bitArray, false)] = i;
           } else {
             currCombinations.Add(ToBitString(bitArray, true));
+              // Console.WriteLine("Curr Combo = " + i + " :: " + ToBitString(bitArray, true));
+
             bitArrayStringToIndex[ToBitString(bitArray, true)] = i;
           }
         }

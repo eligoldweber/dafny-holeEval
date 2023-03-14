@@ -149,6 +149,7 @@ namespace Microsoft.Dafny {
       requestsList.Add(cnt, request);
       }
       var serverId = cnt % serversList.Count;
+      // Console.WriteLine("sending to server " + serverId);
       AsyncUnaryCall<VerificationResponse> task = serversList[serverId].VerifyAsync(request,
         deadline: DateTime.UtcNow.AddMinutes(30000));
       requestToCall[request] = task;
