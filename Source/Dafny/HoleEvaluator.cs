@@ -361,7 +361,7 @@ namespace Microsoft.Dafny {
     }
 
     public static string GetIsWeaker(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr, Boolean isQuantifier) {
-      string res = "lemma isAtLeastWeaker";
+      string res = "lemma isAtLeastAsWeak";
        foreach (var nwPair in path) {
         res += "_" + nwPair.Item1.Name;
       }
@@ -379,9 +379,12 @@ namespace Microsoft.Dafny {
         sep = ", ";
       }
       res += ")\n";
+      if(p != ""){
+        res += "requires " + fn.Name+"_BASE("+p+")\n";
+      }
       foreach (var req in path[0].Item1.Req) {
-        // Console.WriteLine("  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n");
         // res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
+        
         if(isQuantifier){
           res += "  requires forall " + x.Item2 + " :: "+ GetNonPrefixedString(req.E, currentModuleDef) + "\n";
         }else{
@@ -389,8 +392,8 @@ namespace Microsoft.Dafny {
         }
       }
       if(p != ""){
-        res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
-
+        // res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
+        res += "ensures " + fn.Name+"("+p+")\n{}";
       }else{
         res += "  ensures " + fn.Name+"_BASE() ==> " + fn.Name+"()\n{}";
 
@@ -764,7 +767,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         }
       }
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:" + remainingVal);
+        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:");
 
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
           var isSame = isDafnyVerifySuccessful(i);  
@@ -780,7 +783,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           }
         }
                 await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:" + remainingVal);
+        Console.WriteLine("--- END Is Same Pass -- Remaining Mutations:");
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
                 UpdateCombinationResult(i);
         }
