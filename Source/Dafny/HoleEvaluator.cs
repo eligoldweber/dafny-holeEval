@@ -946,7 +946,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       var execTime = output.ExecutionTime;
       executionTimes.Add(execTime);
       startTimes.Add(startTime);
-      return response.Contains("resolution/type errors") || response.Contains("Error: arguments");
+      return response.Contains("parse errors") || response.Contains("resolution/type errors") || response.Contains("Error: arguments");
   }
 
     public async Task<bool> Evaluate(Program program, Program unresolvedProgram, string funcName, string baseFuncName, int depth) {
@@ -1453,6 +1453,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         }
         string env = DafnyOptions.O.Environment.Remove(0, 22);
         var argList = env.Split(' ');
+        Console.WriteLine(argList);
         List<string> args = new List<string>();
         foreach (var arg in argList) {
           if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")) {
@@ -1499,7 +1500,6 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
-      // Console.WriteLine("ELI TEST ==> " +Printer.ExprToString(func.Body) );
 
       string lemmaForExprValidityString = ""; // remove validityCheck
       string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
@@ -1589,10 +1589,21 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         string env = DafnyOptions.O.Environment.Remove(0, 22);
         var argList = env.Split(' ');
         List<string> args = new List<string>();
+
         foreach (var arg in argList) {
           if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")) {
             args.Add(arg);
+
           }
+        }
+         if(isWeaker){
+          args.Add("/proc:*isAtLeastAsWeak*");
+         }else if(includeProof && moduleName == null){
+          // args.Add("/proc:*" + lemma.Name +"*");
+         }
+        // args.Add("/proc:*" + lemma.CompileName );
+        foreach (var arg in args) {
+          // Console.WriteLine("hereerere "  + arg);
         }
         // args.Add("/exitAfterFirstError");
         dafnyVerifier.runDafny(code, args,
