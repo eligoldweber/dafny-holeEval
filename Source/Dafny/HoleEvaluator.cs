@@ -379,9 +379,9 @@ namespace Microsoft.Dafny {
         sep = ", ";
       }
       res += ")\n";
-      if(p != ""){
-        res += "requires " + fn.Name+"_BASE("+p+")\n";
-      }
+      // if(p != ""){
+      //   res += "requires " + fn.Name+"_BASE("+p+")\n";
+      // }
       foreach (var req in path[0].Item1.Req) {
         // res += "  requires " + GetPrefixedString(path[0].Item1.Name + "_", req.E, currentModuleDef) + "\n";
         
@@ -390,6 +390,9 @@ namespace Microsoft.Dafny {
         }else{
           res += "  requires " + GetNonPrefixedString(req.E, currentModuleDef) + "\n";
         }
+      }
+      if(p != ""){
+        res += "requires " + fn.Name+"_BASE("+p+")\n";
       }
       if(p != ""){
         // res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
