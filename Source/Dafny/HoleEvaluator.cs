@@ -1644,7 +1644,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         List<string> args = new List<string>();
 
         foreach (var arg in argList) {
-          if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")) {
+          if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")&& !arg.StartsWith("/proofName") ) {
             args.Add(arg);
 
           }

@@ -166,6 +166,7 @@ namespace Microsoft.Dafny {
         int lemmaStartPos, int postConditionPos) {
       VerificationRequest request = new VerificationRequest();
       request.Code = code;
+      request.Path = "";
       request.Arguments.Add(args);
       var serverId = (availableExprAIndex * availableExprBIndex) % serversList.Count;
       AsyncUnaryCall<VerificationResponse> task = serversList[serverId].VerifyAsync(request);
