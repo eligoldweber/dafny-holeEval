@@ -327,6 +327,30 @@ namespace Microsoft.Dafny {
       return modStr1;
     }
 
+    public static string getVacuityLemma(Lemma l)
+    {
+      string res = "";
+      // res += Printer.ExprToString(baseLemma.Body);
+      using (var wr1 = new System.IO.StringWriter()) {
+        var pr1 = new Printer(wr1);
+        pr1.PrintMethod(l, 0,false);
+        // Console.WriteLine(wr1.ToString());
+        res = wr1.ToString();
+      }
+      int d = res.IndexOf("decreases");
+     foreach (var e in l.Ens) {
+        Console.WriteLine( Printer.ExprToString(e.E));
+     }
+      
+      if(d == -1){
+        int i = res.IndexOf("{");
+        res = res.Insert(i-1, "ensures false;\n");
+      }else{
+        res = res.Insert(d-1, "ensures false;\n");
+      }
+      return res;
+    }
+
     public static string GetIsSameLemmaList(Function fn,List<Tuple<Function, FunctionCallExpr, Expression>> path, ModuleDefinition currentModuleDef, Expression constraintExpr,Boolean isQuantifier) {
       string res = "lemma isSame";
        foreach (var nwPair in path) {
@@ -609,6 +633,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         PrintAllLemmas(program, lemmaName);
         return false;
       }
+      Console.WriteLine(getVacuityLemma(baseLemma));
 
       Function constraintFunc = null;
       if (DafnyOptions.O.HoleEvaluatorConstraint != null) {
@@ -754,14 +779,15 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
       Console.WriteLine("--- END Is At Least As Weak Pass  -- ");
-        Console.WriteLine("--- START Full Proof Pass -- ");
+      Console.WriteLine("--- START Vacuity Pass -- ");
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
           var isWeaker = isDafnyVerifySuccessful(i);  
           var resolutionError = isResolutionError(i);
           // Console.WriteLine("----THIRD PASS " + i + " :: " + !isSame);
           if(!isWeaker && !resolutionError){
             desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-            PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+              PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
+            // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
           }else{
             // if(isSame){Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ") :: IsSame = " + isSame);}
           Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ") :: IsWeaker = " + isWeaker + " :: ResolutionError= " + resolutionError);
@@ -770,8 +796,30 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
             dafnyVerifier.dafnyOutput[request].Response = "isAtLeastAsWeak";
           }
         }
-                await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
-        Console.WriteLine("--- END Full Proof Pass --");
+        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+        Console.WriteLine("--- END Vacuity Pass --");
+        Console.WriteLine("--- START Full Proof Pass -- ");
+        for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+            var isVacuous = isDafnyVerifySuccessful(i);
+            var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i]].Response; //isAtLeastAsWeak
+            if(prevPassRes == "isAtLeastAsWeak"){
+              Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ")");
+            }else if(isVacuous){
+              var request = dafnyVerifier.requestsList[i];
+              dafnyVerifier.dafnyOutput[request].Response = "isVacuous";
+              Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ") :: isVacuous");
+            }else{
+               desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
+              // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
+              PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+          
+            }
+          //  var isWeaker = isDafnyVerifySuccessful(i);  
+        }
+        await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
+        Console.WriteLine("--- END Full Proof Pass -- ");
+
+
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
                 UpdateCombinationResult(i);
         }
@@ -1499,7 +1547,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
     }
 
-    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool isSame) {
+    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool vacTest) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
@@ -1568,9 +1616,11 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
             fnIndex = code.IndexOf("predicate " + funcName);
             code = code.Insert(fnIndex-1,istWeakerLemma+"\n");
           }
-          if(isSame){
-            fnIndex = code.IndexOf("predicate " + funcName);
-            code = code.Insert(fnIndex-1,isSameLemma+"\n");
+          if((vacTest && includeProof)){
+            int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+            int lemmaLocEns = code.IndexOf("{",lemmaLoc);
+            // Console.WriteLine("here = " + lemmaLocEns);
+            code = code.Insert(lemmaLocEns-1,"ensures false;\n");
           }
           
           // fnIndex = code.IndexOf("predicate " + funcName);
