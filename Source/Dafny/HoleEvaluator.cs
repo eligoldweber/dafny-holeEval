@@ -85,7 +85,7 @@ namespace Microsoft.Dafny {
         combinationResults[index] = res;
         // Console.WriteLine(p.StartInfo.Arguments);
         Console.WriteLine(Printer.ExprToString(dafnyVerifier.requestToExpr[request]));
-      } else if (response.EndsWith(" 0 errors\n")) {
+      } else if (response.Contains(" 0 errors\n")) {
         combinationResults[index] = Result.FalsePredicate;
         Console.WriteLine("Mutation that Passes = " + index);
       } else if (response.EndsWith($"resolution/type errors detected in {Path.GetFileName(filePath)}\n")) {
@@ -1658,7 +1658,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         foreach (var arg in args) {
           // Console.WriteLine("hereerere "  + arg);
         }
-        // args.Add("/exitAfterFirstError");
+        args.Add("/compile:0");
         dafnyVerifier.runDafny(code, args,
             expr, cnt, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition);
        
