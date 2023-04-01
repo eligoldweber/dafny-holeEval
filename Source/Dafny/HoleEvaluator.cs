@@ -25,7 +25,8 @@ namespace Microsoft.Dafny {
     IncorrectProof = 3,
     FalsePredicate = 4,
     InvalidExpr = 5,
-    NoMatchingTrigger = 6
+    NoMatchingTrigger = 6,
+    vacousProofPass = 7
   }
   public class HoleEvaluator {
     private string UnderscoreStr = "";
@@ -95,6 +96,49 @@ namespace Microsoft.Dafny {
       }
       expressionFinder.combinationResults[index] = combinationResults[index];
     }
+
+    private void UpdateCombinationResultVacAware(int index,bool vac) {
+      var request = dafnyVerifier.requestsList[index];
+      var position = dafnyVerifier.requestToPostConditionPosition[request];
+      var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
+      var output = dafnyVerifier.dafnyOutput[request];
+      var response = output.Response;
+      var filePath = output.FileName;
+      var startTime = output.StartTime;
+      var execTime = output.ExecutionTime;
+      executionTimes.Add(execTime);
+      startTimes.Add(startTime);
+      var expectedOutput =
+        $"{filePath}({position},0): Error: A postcondition might not hold on this return path.";
+      var expectedInconclusiveOutputStart =
+        $"{filePath}({lemmaStartPosition},{validityLemmaNameStartCol}): Verification inconclusive";
+      // Console.WriteLine($"{index} => {output}");
+      // Console.WriteLine($"{output.EndsWith("0 errors\n")} {output.EndsWith($"resolution/type errors detected in {fileName}.dfy\n")}");
+      // Console.WriteLine($"----------------------------------------------------------------");
+      var res = DafnyVerifierClient.IsCorrectOutput(response, expectedOutput, expectedInconclusiveOutputStart);
+      if (res != Result.IncorrectProof) {
+        // correctExpressions.Add(dafnyMainExecutor.processToExpr[p]);
+        // Console.WriteLine(output);
+        combinationResults[index] = res;
+        // Console.WriteLine(p.StartInfo.Arguments);
+        Console.WriteLine(Printer.ExprToString(dafnyVerifier.requestToExpr[request]));
+      } else if (response.Contains(" 0 errors\n")) {
+        
+        if(vac){
+          Console.WriteLine("Mutation that Passes = " + index + " ** is vacous!");
+          combinationResults[index] = Result.vacousProofPass;
+        }else{
+          Console.WriteLine("Mutation that Passes = " + index);
+          combinationResults[index] = Result.FalsePredicate;
+        }
+      } else if (response.EndsWith($"resolution/type errors detected in {Path.GetFileName(filePath)}\n")) {
+        combinationResults[index] = Result.InvalidExpr;
+      } else {
+        combinationResults[index] = Result.IncorrectProof;
+      }
+      expressionFinder.combinationResults[index] = combinationResults[index];
+    }
+
 
     public Dictionary<string, List<string>> GetEqualExpressionList(Expression expr) {
       // The first element of each value's list in the result is the type of list
@@ -799,14 +843,16 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
         Console.WriteLine("--- END Vacuity Pass --");
         Console.WriteLine("--- START Full Proof Pass -- ");
+        List<int> vacIndex = new List<int>();
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
             var isVacuous = isDafnyVerifySuccessful(i);
             var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i]].Response; //isAtLeastAsWeak
             if(prevPassRes == "isAtLeastAsWeak"){
               Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ")");
             }else if(isVacuous){
-              var request = dafnyVerifier.requestsList[i];
-              dafnyVerifier.dafnyOutput[request].Response = "isVacuous";
+              vacIndex.Add(i);
+              // var request = dafnyVerifier.requestsList[i];
+              // dafnyVerifier.dafnyOutput[request].Response = "isVacuous";
               Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ") :: isVacuous");
             }else{
                desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
@@ -821,7 +867,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
 
 
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
-                UpdateCombinationResult(i);
+                UpdateCombinationResultVacAware(i,vacIndex.Contains(i));
         }
     //   // bool foundCorrectExpr = false;
     //   for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
@@ -854,6 +900,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       int incorrectProofCount = 0;
       int invalidExprCount = 0;
       int falsePredicateCount = 0;
+      int vacousProofPass = 0;
       int noMatchingTriggerCount = 0;
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
         switch (combinationResults[i]) {
@@ -863,6 +910,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           case Result.CorrectProofByTimeout: correctProofByTimeoutCount++; break;
           case Result.IncorrectProof: incorrectProofCount++; break;
           case Result.NoMatchingTrigger: noMatchingTriggerCount++; break;
+          case Result.vacousProofPass: vacousProofPass++; break;
           case Result.Unknown: throw new NotSupportedException();
         }
       }
@@ -871,10 +919,10 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       // Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25} {5, -15} {6, -15}",
       //   invalidExprCount, incorrectProofCount, falsePredicateCount, correctProofCount, correctProofByTimeoutCount,
       //   noMatchingTriggerCount, expressionFinder.availableExpressions.Count);
-      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15}",
-        "InvalidExpr", "IncorrectProof", "ProofPasses", "Total");
-      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15}",
-        invalidExprCount, incorrectProofCount, falsePredicateCount, expressionFinder.availableExpressions.Count);
+      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25}",
+        "InvalidExpr", "IncorrectProof", "ProofPasses", "vacousPasses","Total");
+      Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4, -25}",
+        invalidExprCount, incorrectProofCount, falsePredicateCount, vacousProofPass, expressionFinder.availableExpressions.Count);
       string executionTimesSummary = "";
       // executionTimes.Sort();
       for (int i = 0; i < executionTimes.Count; i++) {
