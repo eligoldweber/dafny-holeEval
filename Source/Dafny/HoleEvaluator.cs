@@ -712,13 +712,18 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       //   pr.PrintFunction(desiredFunction, 0,false);
       //   Console.WriteLine(wr.ToString());
       // }
-      // Console.WriteLine("--------------");
+            Console.WriteLine("---------d----- ");
+
+      Console.WriteLine("-------------- " + desiredFunction != null);
+            Console.WriteLine("---------d----- ");
 
       if (desiredFunction != null) {
         includeParser = new IncludeParser(program);
         var filename = includeParser.Normalized(desiredFunction.BodyStartTok.Filename);
+        Console.WriteLine(filename + " :: ");
         foreach (var file in includeParser.GetListOfAffectedFilesBy(filename)) {
           affectedFiles.Add(file);
+          Console.WriteLine("here +++ "+ filename);
         }
         // calculate holeEvaluatorConstraint Invocation
         if (constraintFunc != null) {

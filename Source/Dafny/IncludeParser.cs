@@ -44,9 +44,12 @@ namespace Microsoft.Dafny {
     private void CreateIncludeGraph()
     {
       var samples = new List<string>();
+                        Console.WriteLine("c pre " + program.DefaultModuleDef.Includes.Count);
+
       if (program.DefaultModuleDef.Includes.Count == 0) {
         return;
       }
+
       foreach (var file in program.DefaultModuleDef.Includes) {
         samples.Add(file.CanonicalPath);
       }
@@ -54,6 +57,8 @@ namespace Microsoft.Dafny {
         samples.First().Substring(0, samples.Min(s => s.Length))
         .TakeWhile((c, i) => samples.All(s => s[i] == c)).ToArray());
       commonPrefixLength = commonPrefix.Length;
+            Console.WriteLine("connom pre " + commonPrefix);
+
       foreach (var includePair in program.DefaultModuleDef.Includes) {
         var includedFilename = Normalized(includePair.IncludedFilename);
         var includerFilename = Normalized(includePair.IncluderFilename);
@@ -65,6 +70,13 @@ namespace Microsoft.Dafny {
     }
 
     public IEnumerable<string> GetListOfAffectedFilesBy(string file) {
+      foreach (var a in affectedFilesList.Keys)
+      {
+
+      Console.WriteLine(a);
+
+      }
+      Console.WriteLine("a");
       if (!affectedFilesList.ContainsKey(file)) {
         yield break;
       }
