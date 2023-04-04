@@ -187,15 +187,16 @@ namespace Microsoft.Dafny {
     public string HoleEvaluatorFunctionName = null;
     public string ProofLemmaName = null;
     public string ProofModuleName = null;
+    public string ProofLocation = null;
     public bool MutationsFromParams = false;
     public string HoleEvaluatorBaseFunctionName = null;
     public int HoleEvaluatorDepth = 1;
     public bool HoleEvaluatorRunOnce = false;
     public bool HoleEvaluatorCreateAuxFiles = true;
     public bool ProofEvaluatorCollectAllTriggerMatches = false;
-    public string HoleEvaluatorWorkingDirectory = "/tmp/outputLogs/";
+    // public string HoleEvaluatorWorkingDirectory = "/tmp/outputLogs/";
       // public string HoleEvaluatorWorkingDirectory = "/tmp/";
-    // public string HoleEvaluatorWorkingDirectory = "/home/edgoldwe/dafny-holeEval/outputLogs/";
+    public string HoleEvaluatorWorkingDirectory = "/home/edgoldwe/dafny-holeEval/outputLogs/";
 
     public string HoleEvaluatorServerIpPortList = null;
     public string HoleEvaluatorInvariant = null;
@@ -671,6 +672,11 @@ namespace Microsoft.Dafny {
         case "proofModuleName":
           if (ps.ConfirmArgumentCount(1)) {
             ProofModuleName = args[ps.i];
+          }
+          return true;
+        case "proofLocation":
+          if (ps.ConfirmArgumentCount(1)) {
+            ProofLocation = args[ps.i];
           }
           return true;
           //mutationsFromParams

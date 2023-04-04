@@ -212,6 +212,7 @@ namespace Microsoft.Dafny {
             continue; // silently ignore duplicate
           }
           dafnyFiles.Add(df);
+        // Console.WriteLine("added = " + df);
           isDafnyFile = true;
         } catch (IllegalDafnyFile) {
           // Fall through and try to handle the file as an "other file"
@@ -304,6 +305,9 @@ namespace Microsoft.Dafny {
       string programName = dafnyFileNames.Count == 1 ? dafnyFileNames[0] : "the_program";
       string err = Dafny.Main.ParseCheck(dafnyFiles, programName, reporter, out var dafnyProgram);
       Dafny.Main.Parse(dafnyFiles, programName, reporter, out var dafnyUnresolvedProgram);
+      
+      Console.WriteLine("naem = " + dafnyProgram);
+
       if (DafnyOptions.O.FindHoleFromFunctionName != null) {
         var holeFinder = new HoleFinder();
         Function holeFunc = null;
@@ -338,11 +342,18 @@ namespace Microsoft.Dafny {
             DafnyOptions.O.ProofModuleName,
             DafnyOptions.O.HoleEvaluatorBaseFunctionName,
             DafnyOptions.O.HoleEvaluatorDepth,
-            DafnyOptions.O.MutationsFromParams);
+            DafnyOptions.O.MutationsFromParams,null,null);
         return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
       }
       if (DafnyOptions.O.HoleEvaluatorFunctionName != null && DafnyOptions.O.ProofLemmaName != null) {
         var holeEvaluator = new HoleEvaluator();
+      if(DafnyOptions.O.ProofLocation != null){
+        var df1 = new DafnyFile(DafnyOptions.O.ProofLocation);
+         var test = new List<DafnyFile>();
+         test.Add(df1);
+        string programName1 = dafnyFileNames.Count == 1 ? dafnyFileNames[0] : "the_program";
+        string err1 = Dafny.Main.ParseCheck(test, programName, reporter, out var dafnyProofProgram);
+        Dafny.Main.Parse(test, programName, reporter, out var dafnyUnresolvedProofProgram);
         var foundDesiredFunction = holeEvaluator.EvaluateFilterStrongerAndSame(dafnyProgram,
             dafnyUnresolvedProgram,
             DafnyOptions.O.HoleEvaluatorFunctionName,
@@ -350,8 +361,22 @@ namespace Microsoft.Dafny {
             null,
             DafnyOptions.O.HoleEvaluatorBaseFunctionName,
             DafnyOptions.O.HoleEvaluatorDepth,
-            DafnyOptions.O.MutationsFromParams);
-        return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
+            DafnyOptions.O.MutationsFromParams,dafnyProofProgram,dafnyUnresolvedProofProgram);
+                    return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
+
+      }else{
+        var foundDesiredFunction = holeEvaluator.EvaluateFilterStrongerAndSame(dafnyProgram,
+            dafnyUnresolvedProgram,
+            DafnyOptions.O.HoleEvaluatorFunctionName,
+            DafnyOptions.O.ProofLemmaName,
+            null,
+            DafnyOptions.O.HoleEvaluatorBaseFunctionName,
+            DafnyOptions.O.HoleEvaluatorDepth,
+            DafnyOptions.O.MutationsFromParams,null,null);
+                    return foundDesiredFunction.Result ? ExitValue.SUCCESS : ExitValue.COMPILE_ERROR;
+
+      }
+
       }
       if (DafnyOptions.O.HoleEvaluatorFunctionName != null) {
         var holeEvaluator = new HoleEvaluator();

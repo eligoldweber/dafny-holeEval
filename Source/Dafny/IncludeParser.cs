@@ -29,7 +29,7 @@ namespace Microsoft.Dafny {
 
     public string Normalized(string path)
     {
-      path = path.Remove(0, commonPrefixLength);
+      // path = path.Remove(0, commonPrefixLength);
       var directoryList = path.Split('/').ToList();
       for (int i = 0; i < directoryList.Count; i++) {
         if (directoryList[i] == "..") {
@@ -54,9 +54,11 @@ namespace Microsoft.Dafny {
         samples.First().Substring(0, samples.Min(s => s.Length))
         .TakeWhile((c, i) => samples.All(s => s[i] == c)).ToArray());
       commonPrefixLength = commonPrefix.Length;
+      Console.WriteLine("common prefxi= " + commonPrefix + "  ::  " + commonPrefixLength);
       foreach (var includePair in program.DefaultModuleDef.Includes) {
         var includedFilename = Normalized(includePair.IncludedFilename);
         var includerFilename = Normalized(includePair.IncluderFilename);
+        Console.WriteLine("inclider = " + includedFilename);
         if (!affectedFilesList.ContainsKey(includedFilename)) {
           affectedFilesList.Add(includedFilename, new List<string>());
         }

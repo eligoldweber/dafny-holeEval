@@ -628,7 +628,7 @@ namespace Microsoft.Dafny {
       }
       return null;
     }
-public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName, string proofModuleName, string baseFuncName, int depth, bool mutationsFromParams) {
+public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program unresolvedProgram, string funcName, string lemmaName, string proofModuleName, string baseFuncName, int depth, bool mutationsFromParams,Program proofProg, Program unresolvedProofProgram) {
       if(proofModuleName != null)
       {
         // Console.WriteLine("MOUDLE = " + proofModuleName);
@@ -671,13 +671,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         }
         return false;
       }
-      Lemma baseLemma = GetLemma(program, lemmaName);
-      if (baseLemma == null) {
-        Console.WriteLine($"couldn't find function {lemmaName}. List of all lemmas:");
-        PrintAllLemmas(program, lemmaName);
-        return false;
-      }
-      Console.WriteLine(getVacuityLemma(baseLemma));
+
 
       Function constraintFunc = null;
       if (DafnyOptions.O.HoleEvaluatorConstraint != null) {
@@ -720,6 +714,24 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         foreach (var file in includeParser.GetListOfAffectedFilesBy(filename)) {
           affectedFiles.Add(file);
         }
+      if(proofProg != null){
+        Lemma desiredLemmm = GetLemma(proofProg, lemmaName);
+              if (desiredLemmm == null) {
+        Console.WriteLine($"couldn't find function {desiredLemmm}. List of all lemmas:");
+        PrintAllLemmas(proofProg, lemmaName);
+        return false;
+      }
+      Console.WriteLine(getVacuityLemma(desiredLemmm));
+              includeParser = new IncludeParser(proofProg);
+        var filenameProof = includeParser.Normalized(desiredLemmm.BodyStartTok.Filename);
+        foreach (var file in includeParser.GetListOfAffectedFilesBy(filenameProof)) {
+          Console.WriteLine("file = " + filenameProof);
+          affectedFiles.Add(file);
+        }
+
+      }
+
+      
         // calculate holeEvaluatorConstraint Invocation
         if (constraintFunc != null) {
           Dictionary<string, List<Expression>> typeToExpressionDictForInputs = new Dictionary<string, List<Expression>>();
@@ -774,6 +786,32 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine($"{funcName} was not found!");
         return false;
       }
+       Lemma baseLemma;
+       if(proofProg == null){
+        baseLemma = GetLemma(program, lemmaName);
+      if (baseLemma == null) {
+        Console.WriteLine($"couldn't find function {lemmaName}. List of all lemmas:");
+        PrintAllLemmas(program, lemmaName);
+        return false;
+      }
+      // Console.WriteLine(getVacuityLemma(baseLemma));
+      }else{
+         baseLemma = GetLemma(proofProg, lemmaName);
+      if (baseLemma == null) {
+        Console.WriteLine($"couldn't find function {lemmaName}. List of all lemmas:");
+        PrintAllLemmas(program, lemmaName);
+        return false;
+      }
+      // Console.WriteLine(getVacuityLemma(baseLemma));
+      }
+      using (var wr1 = new System.IO.StringWriter()) {
+        var pr1 = new Printer(wr1);
+        pr1.PrintMethod(baseLemma, 0,false);
+        Console.WriteLine(wr1.ToString());
+        // res = wr1.ToString();
+      }
+
+      
       int initialCount = expressionFinder.availableExpressions.Count;
       ExpressionFinder expressionFindeTest = new ExpressionFinder(this);
       if(mutationsFromParams){
@@ -819,7 +857,11 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       Console.WriteLine("--- Begin Is At Least As Weak Pass -- " + remainingVal);
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-        PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+        if(unresolvedProofProgram != null){
+            PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+        }else{
+          PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+        }
       }
       await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
       Console.WriteLine("--- END Is At Least As Weak Pass  -- ");
@@ -830,7 +872,11 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           // Console.WriteLine("----THIRD PASS " + i + " :: " + !isSame);
           if(!isWeaker && !resolutionError){
             desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
-              PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
+            if(unresolvedProofProgram != null){
+                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
+            }else{
+              PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
+            }
             // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
           }else{
             // if(isSame){Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ") :: IsSame = " + isSame);}
@@ -844,6 +890,8 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         Console.WriteLine("--- END Vacuity Pass --");
         Console.WriteLine("--- START Full Proof Pass -- ");
         List<int> vacIndex = new List<int>();
+        if(unresolvedProofProgram == null){
+        
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
             var isVacuous = isDafnyVerifySuccessful(i);
             var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i]].Response; //isAtLeastAsWeak
@@ -857,14 +905,14 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
             }else{
                desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
               // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
-              PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+              PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
           
             }
           //  var isWeaker = isDafnyVerifySuccessful(i);  
         }
         await dafnyVerifier.startAndWaitUntilAllProcessesFinishAndDumpTheirOutputs();
         Console.WriteLine("--- END Full Proof Pass -- ");
-
+        }
 
         for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
                 UpdateCombinationResultVacAware(i,vacIndex.Contains(i));
@@ -1595,7 +1643,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
     }
 
-    public void PrintExprAndCreateProcessLemma(Program program, Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool vacTest) {
+    public void PrintExprAndCreateProcessLemma(Program program, Program proofProg,Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool vacTest) {
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
       Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
       var funcName = func.Name;
@@ -1624,6 +1672,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       if (tasksList == null)
       {
         string code = "";
+        string proofCode = "";
         using (var wr = new System.IO.StringWriter()) {
           var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
           pr.UniqueStringBeforeUnderscore = UnderscoreStr;
@@ -1655,6 +1704,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
               code = code + "/*";
             }else{
               //Comment out single 'proof' lemma
+              // Console.WriteLine("=----> " + lemma.Name);
               int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
               code = code.Insert(lemmaLoc-1,"/*"+"\n");
               code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
@@ -1741,6 +1791,207 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         File.WriteAllTextAsync($"{workingDir}/{includeParser.Normalized(func.BodyStartTok.Filename)}", newCode);
       }
     }
+
+    public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program proofProg,Function func, Lemma lemma,string moduleName,Expression expr, int cnt, bool includeProof,bool isWeaker, bool vacTest) {
+      
+      if (!includeProof){
+      bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
+      Console.WriteLine("Mutation -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
+      var funcName = func.Name;
+
+      string lemmaForExprValidityString = ""; // remove validityCheck
+      string basePredicateString = GetBaseLemmaList(func,null, constraintExpr);
+      string isSameLemma = "";
+      string isStrongerLemma = "";
+      string istWeakerLemma = "";
+
+      if(expr is QuantifierExpr){
+        isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,true);
+        istWeakerLemma = GetIsWeaker(func,Paths[0], null, constraintExpr,true);
+        isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,true);
+      }else{
+        isStrongerLemma = GetIsStronger(func,Paths[0], null, constraintExpr,false);
+        istWeakerLemma = GetIsWeaker(func,Paths[0], null, constraintExpr,false);
+        isSameLemma = GetIsSameLemmaList(func,Paths[0], null, constraintExpr,false);
+      }
+
+      int lemmaForExprValidityPosition = 0;
+      int lemmaForExprValidityStartPosition = 0;
+      int basePredicatePosition = 0;
+      int basePredicateStartPosition = 0;
+      var workingDir = $"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}/{funcName}_{cnt}";
+      if (tasksList == null)
+      {
+        string code = "";
+        string proofCode = "";
+        using (var wr = new System.IO.StringWriter()) {
+          var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
+          pr.UniqueStringBeforeUnderscore = UnderscoreStr;
+          // if (expr.HasCardinality) {
+          //   func.Body = Expression.CreateAnd(expr, func.Body);
+          // } else {
+          //   func.Body = Expression.CreateAnd(func.Body, expr);
+          // }
+          func.Body = expr; // Replace Whole Body
+          // lemma.Body = new Block;
+        //     Console.WriteLine("--Function is Mutated--");
+        // using (var wr1 = new System.IO.StringWriter()) {
+        //   var pr1 = new Printer(wr);
+        //   pr1.PrintFunction(func, 0,false);
+        //   Console.WriteLine(wr1.ToString());
+        // }
+        // Console.WriteLine("--------------");
+          pr.PrintProgram(program, true);
+          code = $"// #{cnt}\n";
+          code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
+          
+          int fnIndex = code.IndexOf("predicate " + funcName);
+          code = code.Insert(fnIndex-1,basePredicateString+"\n");
+          // if(!includeProof){
+          //   if(moduleName != null){
+          //     // comment out entire module "assume this is last module"! 
+          //     int moduleLoc = code.IndexOf("module " +moduleName);
+          //     code = code.Insert(moduleLoc-1,"/*"+"\n");
+          //     code = code + "/*";
+          //   }else{
+          //     //Comment out single 'proof' lemma
+          //     Console.WriteLine("=----> " + lemma.Name);
+          //     int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+          //     code = code.Insert(lemmaLoc-1,"/*"+"\n");
+          //     code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
+          //   }
+          // }
+          if(isWeaker){
+            fnIndex = code.IndexOf("predicate " + funcName);
+            code = code.Insert(fnIndex-1,istWeakerLemma+"\n");
+          }
+          if((vacTest && includeProof)){
+            int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+            int lemmaLocEns = code.IndexOf("{",lemmaLoc);
+            // Console.WriteLine("here = " + lemmaLocEns);
+            code = code.Insert(lemmaLocEns-1,"ensures false;\n");
+          }
+          
+          // fnIndex = code.IndexOf("predicate " + funcName);
+          // code = code.Insert(fnIndex-1,isStrongerLemma+"\n");
+
+
+          // lemmaForExprValidityStartPosition = code.Count(f => f == '\n') + 1;
+          // code += lemmaForExprValidityString + "\n";
+          // lemmaForExprValidityPosition = code.Count(f => f == '\n');
+
+          // basePredicateStartPosition = code.Count(f => f == '\n') + 1;
+          // code += basePredicateString + "\n";
+          // basePredicatePosition = code.Count(f => f == '\n');
+
+          // Console.WriteLine(code.IndexOf("lemma isSame_"+funcName));
+          if (DafnyOptions.O.HoleEvaluatorCreateAuxFiles)
+            File.WriteAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}{funcName}_{cnt}.dfy", code);
+        }
+        string env = DafnyOptions.O.Environment.Remove(0, 22);
+        var argList = env.Split(' ');
+        List<string> args = new List<string>();
+
+        foreach (var arg in argList) {
+          if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")&& !arg.StartsWith("/proofName") && !arg.StartsWith("/mutationsFromParams") ) {
+            args.Add(arg);
+          }
+        }
+         if(isWeaker){
+          args.Add("/proc:*isAtLeastAsWeak*");
+         }else if(includeProof && moduleName == null){
+          // args.Add("/proc:*" + lemma.Name +"*");
+         }
+        // args.Add("/proc:*" + lemma.CompileName );
+        foreach (var arg in args) {
+          // Console.WriteLine("hereerere "  + arg);
+        }
+        args.Add("/compile:0");
+        dafnyVerifier.runDafny(code, args,
+            expr, cnt, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition);
+       
+      }
+      else
+      {
+        DuplicateAllFiles(program, workingDir, cnt);
+
+        Expression newFuncBody = null;
+        if (expr.HasCardinality) {
+          newFuncBody = Expression.CreateAnd(expr, func.Body);
+        } else {
+          newFuncBody = Expression.CreateAnd(func.Body, expr);
+        }
+        var baseCode = File.ReadAllLines(func.BodyStartTok.Filename);
+        if (func.BodyStartTok.line == func.BodyEndTok.line) {
+          baseCode[func.BodyStartTok.line - 1] = baseCode[func.BodyStartTok.line - 1].Remove(func.BodyStartTok.col, func.BodyEndTok.col - func.BodyStartTok.col);
+          baseCode[func.BodyStartTok.line - 1] = baseCode[func.BodyStartTok.line - 1].Insert(func.BodyStartTok.col + 1, Printer.ExprToString(newFuncBody));
+        }
+        else {
+          baseCode[func.BodyStartTok.line - 1] = baseCode[func.BodyStartTok.line - 1].Remove(func.BodyStartTok.col);
+          for (int i = func.BodyStartTok.line; i < func.BodyEndTok.line - 1; i++) {
+            baseCode[i] = "";
+          }
+          baseCode[func.BodyEndTok.line - 1] = baseCode[func.BodyEndTok.line - 1].Remove(0, func.BodyEndTok.col - 1);
+          baseCode[func.BodyStartTok.line - 1] = baseCode[func.BodyStartTok.line - 1].Insert(func.BodyStartTok.col, Printer.ExprToString(newFuncBody));
+        }
+        lemmaForExprValidityStartPosition = baseCode.Length;
+        baseCode = baseCode.Append(lemmaForExprValidityString).ToArray();
+        lemmaForExprValidityPosition = baseCode.Length;
+        var newCode = String.Join('\n', baseCode);
+        File.WriteAllTextAsync($"{workingDir}/{includeParser.Normalized(func.BodyStartTok.Filename)}", newCode);
+      }
+    }else{
+      Console.WriteLine("Mutation(proof) -> " + $"{cnt}" + ": " + $"{Printer.ExprToString(expr)}");
+       string code = "";
+        string proofCode = "";
+          var lemmaName = lemma.Name;
+      var funcName = func.Name;
+
+      int lemmaForExprValidityPosition = 0;
+      int lemmaForExprValidityStartPosition = 0;
+      int basePredicatePosition = 0;
+      int basePredicateStartPosition = 0;
+      var workingDir = $"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}/{lemmaName}_{cnt}";
+
+        using (var wr = new System.IO.StringWriter()) {
+          var pr = new Printer(wr, DafnyOptions.PrintModes.DllEmbed);
+          pr.UniqueStringBeforeUnderscore = UnderscoreStr;
+          func.Body = expr;
+      
+          pr.PrintProgram(proofProg, true);
+          code = $"// #{cnt}\n";
+          code += $"// {Printer.ExprToString(expr)}\n" + Printer.ToStringWithoutNewline(wr) + "\n\n";
+
+          int fnIndex = code.IndexOf("predicate " + funcName);
+          int fnIndex1 = code.IndexOf("{",fnIndex);
+
+          code = code.Insert(fnIndex1+1,Printer.ExprToString(expr)+$"/*\n");
+                    int fnIndex2 = code.IndexOf("}",fnIndex1);
+
+          code = code.Insert(fnIndex2-1,$"*/ \n");
+            // Console.WriteLine(code);
+
+          if (DafnyOptions.O.HoleEvaluatorCreateAuxFiles)
+            File.WriteAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}{lemmaName}_{cnt}.dfy", code);
+        }
+         string env = DafnyOptions.O.Environment.Remove(0, 22);
+        var argList = env.Split(' ');
+        List<string> args = new List<string>();
+
+        foreach (var arg in argList) {
+          if (!arg.EndsWith(".dfy") && !arg.StartsWith("/holeEval") && arg.StartsWith("/")&& !arg.StartsWith("/proofName") && !arg.StartsWith("/mutationsFromParams") ) {
+            args.Add(arg);
+          }
+        }
+         args.Add("/proc:*"+lemmaName+"*");
+        args.Add("/compile:0");
+        dafnyVerifier.runDafny(code, args,
+            expr, cnt, lemmaForExprValidityPosition, lemmaForExprValidityStartPosition);
+
+    }
+  }
+
+
 
     public void PrintImplies(Program program, Function func, int availableExprAIndex, int availableExprBIndex) {
       // Console.WriteLine($"print implies {availableExprAIndex} {availableExprBIndex}");
