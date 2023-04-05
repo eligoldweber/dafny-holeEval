@@ -359,15 +359,15 @@ namespace Microsoft.Dafny {
       res += Printer.ExprToString(fn.Body);
       res += "\n}";
       // return res;
-
+      // Console.WriteLine(fn.Name);
         using (var wr = new System.IO.StringWriter()) {
         var pr = new Printer(wr);
         pr.ModuleForTypes = currentModuleDef;
         pr.PrintFunction(fn, 0,false);
         res = wr.ToString();
       }
-      int i = res.IndexOf("(");
-      String modStr1 = res.Insert(i, "_BASE");
+      int i = res.IndexOf(fn.Name);
+      String modStr1 = res.Insert(i, "BASE_");
       return modStr1;
     }
 
@@ -460,13 +460,13 @@ namespace Microsoft.Dafny {
         }
       }
       if(p != ""){
-        res += "requires " + fn.Name+"_BASE("+p+")\n";
+        res += "requires BASE_" + fn.Name+"("+p+")\n";
       }
       if(p != ""){
         // res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
         res += "ensures " + fn.Name+"("+p+")\n{}\n";
       }else{
-        res += "  ensures " + fn.Name+"_BASE() ==> " + fn.Name+"()\n{}";
+        res += "  ensures BASE_" + fn.Name+" ==> " + fn.Name+"()\n{}";
 
       }
       return res;
