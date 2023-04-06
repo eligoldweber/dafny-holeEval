@@ -432,6 +432,12 @@ namespace Microsoft.Dafny {
       string res = "lemma isAtLeastAsWeak";
        foreach (var nwPair in path) {
         res += "_" + nwPair.Item1.Name;
+      
+      }
+      foreach(var t in fn.TypeArgs)
+      {
+        res += "<"+t+"(0,!new)>";
+        // Console.WriteLine("a = " + t);
       }
       res += "(";
       var sep = "";
@@ -714,6 +720,9 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
         foreach (var file in includeParser.GetListOfAffectedFilesBy(filename)) {
           affectedFiles.Add(file);
         }
+        // dafnyVerifier.InitializeBaseFoldersInRemoteServers(program, includeParser.commonPrefix);
+        // affectedFiles.Add(filename);
+        // affectedFiles = affectedFiles.Distinct().ToList();
       if(proofProg != null){
         Lemma desiredLemmm = GetLemma(proofProg, lemmaName);
               if (desiredLemmm == null) {
@@ -728,6 +737,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
           Console.WriteLine("file = " + filenameProof);
           affectedFiles.Add(file);
         }
+
 
       }
 
@@ -1528,10 +1538,8 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       return null;
     }
 
-    public void DuplicateAllFiles(Program program, string workingDir, int cnt)
-    {
-      if (System.IO.Directory.Exists(workingDir))
-      {
+    public void DuplicateAllFiles(Program program, string workingDir, int cnt) {
+      if (System.IO.Directory.Exists(workingDir)) {
         System.IO.Directory.Delete(workingDir, true);
       }
       System.IO.Directory.CreateDirectory(workingDir);
@@ -1763,6 +1771,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
       }
       else
       {
+        Console.WriteLine("HEHREHREHREHREHREHR __ Duplcate");
         DuplicateAllFiles(program, workingDir, cnt);
 
         Expression newFuncBody = null;

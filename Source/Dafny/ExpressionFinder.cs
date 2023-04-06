@@ -24,12 +24,34 @@ namespace Microsoft.Dafny {
     private int numberOfSingleExpr = 0;
     private HoleEvaluator holeEval = null;
     private ProofEvaluator proofEval = null;
+    
     public List<Expression> availableExpressions = new List<Expression>();
     private List<BitArray> bitArrayList = new List<BitArray>();
     private HashSet<string> currCombinations = new HashSet<string>();
     private Dictionary<string, int> bitArrayStringToIndex = new Dictionary<string, int>();
     public Dictionary<int, Result> combinationResults = new Dictionary<int, Result>();
     private Dictionary<int, int> negateOfExpressionIndex = new Dictionary<int, int>();
+
+
+    public class ExpressionDepth {
+      public Expression expr;
+      public int depth;
+      public ExpressionDepth(Expression expr, int depth) 
+      {
+        this.expr = expr;
+        this.depth = depth;
+      }
+    }
+
+    public class StatementDepth {
+      public Statement stmt;
+      public int depth;
+      public StatementDepth(Statement stmt, int depth) 
+      {
+        this.stmt = stmt;
+        this.depth = depth;
+      }
+    }
 
     public ExpressionFinder(HoleEvaluator holeEval) {
       this.holeEval = holeEval;
@@ -421,6 +443,8 @@ namespace Microsoft.Dafny {
           Console.WriteLine(" ExistsExpr = " + equalExprToCheck);
           return currentExperssions;
         }else{ //Assume Binary Expr
+                  Console.WriteLine(" expr = " + equalExprToCheck);
+
           return getMutatedExprs(program,desiredFunction,equalExprToCheck as BinaryExpr);
         }
     }
