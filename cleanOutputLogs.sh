@@ -1,3 +1,3 @@
 #!/bin/bash
 
-rm -rf outputLogs/*
+rm -rf /tmp/outputLogs/*
