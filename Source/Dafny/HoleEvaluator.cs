@@ -1718,7 +1718,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
               // Console.WriteLine("=----> " + lemma.Name);
               int lemmaLoc = code.IndexOf("lemma " +lemma.Name +"(");
               code = code.Insert(lemmaLoc-1,"/*"+"\n");
-              code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)+1,"*/"+"\n");
+              code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
             }
           }
           if(isWeaker){
