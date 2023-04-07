@@ -467,12 +467,15 @@ namespace Microsoft.Dafny {
       }
       if(p != ""){
         res += "requires BASE_" + fn.Name+"("+p+")\n";
+      }else{
+        res += "requires BASE_" + fn.Name+"()\n";
       }
       if(p != ""){
         // res += "  ensures forall " + p + " :: "+ fn.Name+"_BASE("+p+") ==> " + fn.Name+"("+p+")\n{}";
         res += "ensures " + fn.Name+"("+p+")\n{}\n";
       }else{
-        res += "  ensures BASE_" + fn.Name+" ==> " + fn.Name+"()\n{}";
+        // res += "  ensures BASE_" + fn.Name+" ==> " + fn.Name+"()\n{}";
+        res += "ensures " + fn.Name+"()\n{}\n";
 
       }
       return res;
@@ -1713,9 +1716,9 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
             }else{
               //Comment out single 'proof' lemma
               // Console.WriteLine("=----> " + lemma.Name);
-              int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+              int lemmaLoc = code.IndexOf("lemma " +lemma.Name +"(");
               code = code.Insert(lemmaLoc-1,"/*"+"\n");
-              code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)-1,"*/"+"\n");
+              code = code.Insert(code.IndexOf("}\n\n",lemmaLoc)+1,"*/"+"\n");
             }
           }
           if(isWeaker){
@@ -1758,7 +1761,7 @@ public async Task<bool> EvaluateFilterStrongerAndSame(Program program, Program u
          if(isWeaker){
           args.Add("/proc:*isAtLeastAsWeak*");
          }else if(includeProof && moduleName == null){
-          // args.Add("/proc:*" + lemma.Name +"*");
+          args.Add("/proc:*" + lemma.Name +"*");
          }
         // args.Add("/proc:*" + lemma.CompileName );
         foreach (var arg in args) {
