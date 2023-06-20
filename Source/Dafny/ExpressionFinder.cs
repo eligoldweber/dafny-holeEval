@@ -1028,7 +1028,9 @@ public List<ExpressionDepth> mutateOneExpressionRevised(Program program, MemberD
             foreach (var newMutations in mutatedLogicalE)
             {
               Console.WriteLine("---> " + Printer.ExprToString(newMutations));
+                if(currentExperssions.Count < 500){
               currentExperssions.Add(new ExpressionDepth(newMutations,1));
+                }
             } 
             // Console.WriteLine("---> " + Printer.ExprToString(allTogether));
             // currentExperssions.Add(new ExpressionDepth(allTogether,1));

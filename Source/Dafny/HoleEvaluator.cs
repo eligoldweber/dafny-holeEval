@@ -67,6 +67,8 @@ namespace Microsoft.Dafny {
     public static string lemmaForExprValidityString = "";
     private static int lemmaForExprValidityLineCount = 0;
 
+    // public string staticValidityLemma = ""
+
     // public static string lemmaForExprValidityString = "";
     // private static int lemmaForExprValidityLineCount = 0;
     private void UpdateCombinationResult(int index) {
@@ -159,7 +161,7 @@ public async Task<bool>writeFailedOutputs(int index)
 
     private void UpdateCombinationResultVacAwareList(int index,bool vac) {
       var requestList = dafnyVerifier.requestsList[index];
-      for(int i = 2; i<requestList.Count;i++){
+      for(int i = 3; i<requestList.Count;i++){
           var request = requestList[i];
           var position = dafnyVerifier.requestToPostConditionPosition[request];
           var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
@@ -168,7 +170,7 @@ public async Task<bool>writeFailedOutputs(int index)
           var filePath = output.FileName;
           var execTime = output.ExecutionTimeInMs;
           executionTimes.Add(execTime);
-          verboseExecTimes.Add("(" + index + ") "+ filePath,execTime);
+          verboseExecTimes.Add("(" + index + ", "+ i + ") "+ filePath,execTime);
           if(verboseExecTimesTotal.ContainsKey(index)){
             verboseExecTimesTotal[index] = verboseExecTimesTotal[index] + execTime;
           }else{
@@ -815,6 +817,8 @@ public async Task<bool>writeFailedOutputs(int index)
         var input = File.ReadAllText(DafnyOptions.O.HoleEvaluatorCommands);
         tasksList = Google.Protobuf.JsonParser.Default.Parse<TasksList>(input);
       }
+      // var inputTest = File.ReadAllText("staticValididityLemma.txt");
+
       dafnyVerifier = new DafnyVerifierClient(DafnyOptions.O.HoleEvaluatorServerIpPortList, $"output_{funcName}");
       expressionFinder = new ExpressionFinder(this);
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
@@ -831,7 +835,7 @@ public async Task<bool>writeFailedOutputs(int index)
       if (baseFuncName == null) {
         baseFuncName = funcName;
       }
-      Function baseFunc = GetFunction(program, baseFuncName);
+      Function baseFunc = GetFunction(proofProg, baseFuncName);
 
 
       if (baseFunc == null) {
@@ -1089,7 +1093,7 @@ public async Task<bool>writeFailedOutputs(int index)
       for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
         desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
         if(unresolvedProofProgram != null){
-            PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+            PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false,false);
         }else{
           PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
         }
@@ -1107,7 +1111,7 @@ public async Task<bool>writeFailedOutputs(int index)
           if(!isWeaker && !resolutionError){
             desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
             if(unresolvedProofProgram != null){
-                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
+                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true,false);
             }else{
               PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,false,true);
             }
@@ -1130,6 +1134,27 @@ public async Task<bool>writeFailedOutputs(int index)
         Console.WriteLine("--- END Vacuity Pass --");
         VacStopwatch.Stop();
         Console.WriteLine("Elapsed Time is {0} ms", VacStopwatch.ElapsedMilliseconds);
+        Console.WriteLine("--- START Validity Pass -- ");
+        for (int i = 0; i < expressionFinder.availableExpressions.Count; i++) {
+            var isVacuous = isDafnyVerifySuccessful(i);
+            var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i].First()].Response; //isAtLeastAsWeak
+            if(prevPassRes == "isAtLeastAsWeak"){
+              Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ")");
+            }else if(isVacuous){
+              Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ")");
+            }else{
+              if(unresolvedProofProgram != null){
+                  PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false,true);
+              }else{
+                PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved, baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,false,true,false);
+              }
+            }
+        }
+        await dafnyVerifier.startProofTasksAccordingToPriority();
+        dafnyVerifier.clearTasks();
+
+        Console.WriteLine("--- END Validity Pass --");
+      // var inputTest = File.ReadAllText("staticValididityLemma.txt");
 
         Console.WriteLine("--- START Full Proof Pass -- ");
         Stopwatch FullStopWatch = new Stopwatch();
@@ -1149,7 +1174,7 @@ public async Task<bool>writeFailedOutputs(int index)
               Console.WriteLine("Failed Afer 2nd PASS:  Index(" + i + ") :: isVacuous"); // Note that it is vacous, but still check
                 desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
                 if(unresolvedProofProgram != null){
-                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false,false);
               }else{
               // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
               PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
@@ -1158,7 +1183,7 @@ public async Task<bool>writeFailedOutputs(int index)
             }else{
                desiredFunctionUnresolved.Body = topLevelDeclCopy.Body;
                 if(unresolvedProofProgram != null){
-                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
+                PrintExprAndCreateProcessLemmaSeperateProof(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false,false);
               }else{
               // PrintExprAndCreateProcessLemma(unresolvedProgram, desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,true);
               PrintExprAndCreateProcessLemma(unresolvedProgram, unresolvedProofProgram,desiredFunctionUnresolved,baseLemma,proofModuleName,expressionFinder.availableExpressions[i], i,true,false,false);
@@ -1777,6 +1802,7 @@ public async Task<bool> Evaluate(Program program, Program unresolvedProgram, str
     public static Function GetFunction(Program program, string funcName) {
       foreach (var kvp in program.ModuleSigs) {
         foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls)) {
+          Console.WriteLine("NAME = " +topLevelDecl.FullDafnyName);
           if (topLevelDecl.FullDafnyName == funcName) {
             return topLevelDecl;
           }
@@ -2044,7 +2070,7 @@ public async Task<bool> Evaluate(Program program, Program unresolvedProgram, str
     }
 
 
-public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program proofProg,Function func, Lemma lemma,string moduleName,ExpressionFinder.ExpressionDepth expr, int cnt, bool includeProof,bool isWeaker, bool vacTest) {
+public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program proofProg,Function func, Lemma lemma,string moduleName,ExpressionFinder.ExpressionDepth expr, int cnt, bool includeProof,bool isWeaker, bool vacTest, bool validTest) {
       
       if (!includeProof){
       bool runOnce = DafnyOptions.O.HoleEvaluatorRunOnce;
@@ -2055,6 +2081,7 @@ public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program
         string isSameLemma = "";
       string isStrongerLemma = "";
       string istWeakerLemma = "";
+      string staticValid = File.ReadAllText("staticValididityLemma.txt");
       if(constraintExpr == null)
       {
          basePredicateString = GetBaseLemmaList(func,null, null);
@@ -2182,6 +2209,14 @@ public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program
             // int lemmaLocEns = code.IndexOf("{",lemmaLoc);
             // // Console.WriteLine("here = " + lemmaLocEns);
             // code = code.Insert(lemmaLocEns-1,"ensures false;\n");
+          }
+          if(validTest){
+            if(func.WhatKind == "predicate"){
+              fnIndex = code.IndexOf("predicate " + funcName);
+            }else{
+              fnIndex = code.IndexOf("function " + funcName);
+            }
+            code = code.Insert(fnIndex-1,staticValid+"\n");
           }
           
           // fnIndex = code.IndexOf("predicate " + funcName);
@@ -2423,14 +2458,21 @@ public void PrintExprAndCreateProcessLemmaSeperateProof(Program program, Program
          args.Add("/proc:*"+lemmaName+"*");
         }else if(DafnyOptions.O.EvaluateAllAtOnce){
           args.Add("/verifyAllModules");
-        }else if(DafnyOptions.O.ProofOnly){ // maybe at least add the spec file? 
+        }else if(DafnyOptions.O.ProofOnly && !validTest){ // maybe at least add the spec file? 
           var changingFilePathSpec = includeParser.Normalized(func.BodyStartTok.Filename);
           var constraintFuncChangingFilePathSpec = includeParser.Normalized(func.BodyStartTok.Filename);
           var remoteFilePathSpec = dafnyVerifier.getTempFilePath()[serverIndexLemma][localizedCntIndexLemma+1].Path;
           dafnyVerifier.runDafny("", args,
             expr, cnt, -1, -1,$"{remoteFilePathSpec}/{constraintFuncChangingFilePathSpec}");
 
-        }else{
+        }else if(validTest){
+          Console.WriteLine("here");
+          string staticValid = File.ReadAllText("staticValididityLemma.txt");
+          int lemmaLoc = code.IndexOf("lemma " +lemma.Name);
+          // int lemmaLocEns = code.IndexOf("}",lemmaLoc);
+          code = code.Insert(lemmaLoc-1,staticValid+"\n");
+
+        }else {
           foreach (var depn in includesSet)
             {
               // Console.WriteLine("HERE => " + $"{remoteFilePathLemma}/{depn}");

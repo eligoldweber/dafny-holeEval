@@ -1,0 +1,78 @@
+/*
+lemma {:timeLimitMultiplier 2} validityCheck_UponProposal_isValidProposal_isProposalJustification_isHighestPrepared(
+    UponProposal_current:NodeState, UponProposal_next:NodeState, UponProposal_outQbftMessages:set<QbftMessageWithRecipient>, 
+    isValidProposal_m:QbftMessage, isValidProposal_current:NodeState, isValidProposal_roundLeader:Address,
+    isProposalJustification_roundChanges:set<SignedRoundChange>, isProposalJustification_prepares:set<SignedPrepare>, isProposalJustification_setOfAvailableBlocks:set<Block>, isProposalJustification_height:nat, isProposalJustification_round:nat, isProposalJustification_block:Block, isProposalJustification_validateBlock:Block -> bool, isProposalJustification_roundLeader:Address, isProposalJustification_validators:seq<Address>, 
+    isHighestPrepared_sPayload:SignedRoundChange, isHighestPrepared_roundChanges:set<SignedRoundChange>,
+    UponProposal_m: L1_SpecTypes.QbftMessage,
+    isProposalJustification_rcm: L1_SpecTypes.SignedRoundChange ,
+    isValidProposal_b:L1_SpecTypes.Block -> bool)
+  requires L1_AuxiliaryFunctionsAndLemmas.validNodeState(UponProposal_current)
+  requires L1_Spec.UponProposal(UponProposal_current, UponProposal_next, UponProposal_outQbftMessages)
+  requires L1_AuxiliaryFunctionsAndLemmas.isValidProposal(UponProposal_m, UponProposal_current)
+  requires UponProposal_m == isValidProposal_m
+  requires UponProposal_current == isValidProposal_current
+  requires L1_AuxiliaryFunctionsAndLemmas.validNodeState(isValidProposal_current)
+  requires L1_AuxiliaryFunctionsAndLemmas.isValidProposal(UponProposal_m, UponProposal_current)
+  requires isValidProposal_m.proposalJustification == isProposalJustification_roundChanges
+  requires isValidProposal_m.roundChangeJustification == isProposalJustification_prepares
+  requires {isValidProposal_m.proposedBlock} == isProposalJustification_setOfAvailableBlocks
+  requires |isValidProposal_current.blockchain| == isProposalJustification_height
+  requires isValidProposal_m.proposalPayload.unsignedPayload.round == isProposalJustification_round
+  requires isValidProposal_m.proposedBlock == isProposalJustification_block
+  requires isValidProposal_b == (isValidProposal_b => L1_AuxiliaryFunctionsAndLemmas.validateNonPreparedBlock(isValidProposal_b, isValidProposal_current.blockchain, isValidProposal_m.proposalPayload.unsignedPayload.round))
+  requires isValidProposal_b == isProposalJustification_validateBlock
+  requires isValidProposal_roundLeader == isProposalJustification_roundLeader
+  requires L1_AuxiliaryFunctionsAndLemmas.validators(isValidProposal_current.blockchain) == isProposalJustification_validators
+  requires L1_AuxiliaryFunctionsAndLemmas.isProposalJustification(isValidProposal_m.proposalJustification, isValidProposal_m.roundChangeJustification, {isValidProposal_m.proposedBlock}, |isValidProposal_current.blockchain|, isValidProposal_m.proposalPayload.unsignedPayload.round, isValidProposal_m.proposedBlock, isValidProposal_b, isValidProposal_roundLeader, L1_AuxiliaryFunctionsAndLemmas.validators(isValidProposal_current.blockchain))
+  requires  L1_AuxiliaryFunctionsAndLemmas.isHighestPrepared(isProposalJustification_rcm, isProposalJustification_roundChanges) 
+          && ghost var isProposalJustification_proposedBlockWithOldRound  := L1_AuxiliaryFunctionsAndLemmas.replaceRoundInBlock(isProposalJustification_block, L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedRound)); 
+            L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedValue) == L1_AuxiliaryFunctionsAndLemmas.digest(isProposalJustification_proposedBlockWithOldRound) 
+          && forall isProposalJustification_pm | isProposalJustification_pm in isProposalJustification_prepares :: L1_AuxiliaryFunctionsAndLemmas.validSignedPrepareForHeightRoundAndDigest(isProposalJustification_pm, isProposalJustification_height, L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedRound), L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedValue), isProposalJustification_validators);
+  requires isProposalJustification_rcm == isHighestPrepared_sPayload
+  requires isProposalJustification_roundChanges == isHighestPrepared_roundChanges
+  requires L1_AuxiliaryFunctionsAndLemmas.isHighestPrepared(isProposalJustification_rcm, isProposalJustification_roundChanges)
+  ensures false
+{}
+*/
+
+  lemma {:timeLimitMultiplier 2} validityCheck_UponProposal_isValidProposal_isProposalJustification_isHighestPrepared(
+    UponProposal_current:NodeState, UponProposal_next:NodeState, UponProposal_outQbftMessages:set<QbftMessageWithRecipient>, 
+    isValidProposal_m:QbftMessage, isValidProposal_current:NodeState, isValidProposal_roundLeader:Address,
+    isProposalJustification_roundChanges:set<SignedRoundChange>, isProposalJustification_prepares:set<SignedPrepare>, isProposalJustification_setOfAvailableBlocks:set<Block>, isProposalJustification_height:nat, isProposalJustification_round:nat, isProposalJustification_block:Block, isProposalJustification_validateBlock:Block -> bool, isProposalJustification_roundLeader:Address, isProposalJustification_validators:seq<Address>, 
+    isHighestPrepared_sPayload:SignedRoundChange, isHighestPrepared_roundChanges:set<SignedRoundChange>,
+    UponProposal_m: L1_SpecTypes.QbftMessage,
+    isProposalJustification_rcm: L1_SpecTypes.SignedRoundChange ,
+    isValidProposal_b:L1_SpecTypes.Block -> bool)
+  requires L1_AuxiliaryFunctionsAndLemmas.validNodeState(UponProposal_current)
+  requires L1_Spec.UponProposal(UponProposal_current, UponProposal_next, UponProposal_outQbftMessages)
+  requires L1_AuxiliaryFunctionsAndLemmas.isValidProposal(UponProposal_m, UponProposal_current)
+  requires UponProposal_m == isValidProposal_m
+  requires UponProposal_current == isValidProposal_current
+  requires L1_AuxiliaryFunctionsAndLemmas.validNodeState(isValidProposal_current)
+  requires L1_AuxiliaryFunctionsAndLemmas.isValidProposal(UponProposal_m, UponProposal_current)
+  requires isValidProposal_m.proposalJustification == isProposalJustification_roundChanges
+  requires isValidProposal_m.roundChangeJustification == isProposalJustification_prepares
+  requires {isValidProposal_m.proposedBlock} == isProposalJustification_setOfAvailableBlocks
+  requires |isValidProposal_current.blockchain| == isProposalJustification_height
+  requires isValidProposal_m.proposalPayload.unsignedPayload.round == isProposalJustification_round
+  requires isValidProposal_m.proposedBlock == isProposalJustification_block
+  requires isValidProposal_b == (isValidProposal_b => L1_AuxiliaryFunctionsAndLemmas.validateNonPreparedBlock(isValidProposal_b, isValidProposal_current.blockchain, isValidProposal_m.proposalPayload.unsignedPayload.round))
+  requires isValidProposal_b == isProposalJustification_validateBlock
+  requires isValidProposal_roundLeader == isProposalJustification_roundLeader
+  requires L1_AuxiliaryFunctionsAndLemmas.validators(isValidProposal_current.blockchain) == isProposalJustification_validators
+  requires L1_AuxiliaryFunctionsAndLemmas.isProposalJustification(isValidProposal_m.proposalJustification, isValidProposal_m.roundChangeJustification, {isValidProposal_m.proposedBlock}, |isValidProposal_current.blockchain|, isValidProposal_m.proposalPayload.unsignedPayload.round, isValidProposal_m.proposedBlock, isValidProposal_b, isValidProposal_roundLeader, L1_AuxiliaryFunctionsAndLemmas.validators(isValidProposal_current.blockchain))
+//   requires  L1_AuxiliaryFunctionsAndLemmas.isHighestPrepared(isProposalJustification_rcm, isProposalJustification_roundChanges) 
+//           && ghost var isProposalJustification_proposedBlockWithOldRound  := 
+        // L1_AuxiliaryFunctionsAndLemmas.replaceRoundInBlock(isProposalJustification_block, L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedRound)); 
+//             L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedValue) == L1_AuxiliaryFunctionsAndLemmas.digest(isProposalJustification_proposedBlockWithOldRound) 
+//           && forall isProposalJustification_pm | isProposalJustification_pm in isProposalJustification_prepares :: L1_AuxiliaryFunctionsAndLemmas.validSignedPrepareForHeightRoundAndDigest(isProposalJustification_pm, isProposalJustification_height, L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedRound), L1_AuxiliaryFunctionsAndLemmas.optionGet(isProposalJustification_rcm.unsignedPayload.preparedValue), isProposalJustification_validators);
+  requires isProposalJustification_rcm == isHighestPrepared_sPayload
+  requires isProposalJustification_roundChanges == isHighestPrepared_roundChanges
+  requires L1_AuxiliaryFunctionsAndLemmas.isHighestPrepared(isProposalJustification_rcm, isProposalJustification_roundChanges)
+  requires isValidProposal_m.proposalPayload.unsignedPayload.round != 0
+  requires !(forall m | m in isValidProposal_m.proposalJustification :: && !L1_AuxiliaryFunctionsAndLemmas.optionIsPresent(m.unsignedPayload.preparedRound)
+                                                    && !L1_AuxiliaryFunctionsAndLemmas.optionIsPresent(m.unsignedPayload.preparedValue))
+//   requires !(forall m | m in isValidProposal_m.proposalJustification :: true)
+  ensures false
+{}
