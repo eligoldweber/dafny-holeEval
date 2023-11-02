@@ -61,8 +61,8 @@ namespace Microsoft.Dafny {
         return;
       }
       var request = dafnyVerifier.requestsList[index];
-      var output = dafnyVerifier.dafnyOutput[request[0]];
-      var response = output.Response;
+      var output = dafnyVerifier.dafnyOutput[request[0]].ResponseList[0];
+      var response = output.Response.ToStringUtf8();
       var filePath = output.FileName;
 var execTime = output.ExecutionTimeInMs;
         executionTimes.Add(execTime);
@@ -801,9 +801,9 @@ var execTime = output.ExecutionTimeInMs;
       //   workingLemma.Body.Body.RemoveAt(0);
       // }
 
-      dafnyVerifier.runDafnyProofCheck(newCode, tasksListDictionary[changingFilePath].Arguments.ToList(),
-              exprStmtList, cnt, changingFilePath,
-              workingLemma.FullDafnyName);
+      // dafnyVerifier.runDafnyProofCheck(newCode, tasksListDictionary[changingFilePath].Arguments.ToList(),
+      //         exprStmtList, cnt, changingFilePath,
+      //         workingLemma.FullDafnyName);
     }
   }
 }

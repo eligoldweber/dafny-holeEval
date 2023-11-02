@@ -16,6 +16,7 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Boogie;
 using System.Threading.Tasks;
+using Google.Protobuf;
 
 namespace Microsoft.Dafny {
   public class SpecInputOutputChecker {
@@ -1004,7 +1005,7 @@ public async Task<bool> EvaluateMethodInPlace(Program program, Program unresolve
             Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ") :: IsWeaker = " + isWeaker + " :: ResolutionError= " + resolutionError);
              var requestList = dafnyVerifier.requestsList[i];
              foreach (var request in requestList){
-              dafnyVerifier.dafnyOutput[request].Response = "isAtLeastAsWeak";
+              dafnyVerifier.dafnyOutput[request].ResponseList[0].Response = ByteString.CopyFrom("isAtLeastAsWeak", Encoding.Unicode);// ByteString.copyFromUtf8("isAtLeastAsWeak");
             }
           }
           writeOutputs(i);
@@ -1020,7 +1021,7 @@ public async Task<bool> EvaluateMethodInPlace(Program program, Program unresolve
       for(int i = 0; i < inPlaceMutationList.Count; i++)
       {
         var isVacuous = isDafnyVerifySuccessful(i);
-            var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i].First()].Response; //isAtLeastAsWeak
+            var prevPassRes = dafnyVerifier.dafnyOutput[dafnyVerifier.requestsList[i].First()].ResponseList[0].Response.ToStringUtf8(); //isAtLeastAsWeak
             if(prevPassRes == "isAtLeastAsWeak"){
               Console.WriteLine("Failed Afer 1st PASS:  Index(" + i + ")");
             }else if(isVacuous){
@@ -1119,8 +1120,8 @@ public void UpdateCombinationResultVacAwareList(int index,bool vac) {
           var request = requestList[i];
           var position = dafnyVerifier.requestToPostConditionPosition[request];
           var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-          var output = dafnyVerifier.dafnyOutput[request];
-          var response = output.Response;
+          var output = dafnyVerifier.dafnyOutput[request].ResponseList[0];
+          var response = output.Response.ToStringUtf8();
           var filePath = output.FileName;
           var execTime = output.ExecutionTimeInMs;
           executionTimes.Add(execTime);
@@ -1181,8 +1182,8 @@ public async Task<bool>writeFinalOutputs(int index)
       var request = requestList[i];
       var position = dafnyVerifier.requestToPostConditionPosition[request];
       var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-      var output = dafnyVerifier.dafnyOutput[request];
-      var response = output.Response;
+      var output = dafnyVerifier.dafnyOutput[request].ResponseList[0];
+      var response = output.Response.ToStringUtf8();
       if (DafnyOptions.O.HoleEvaluatorCreateAuxFiles){
               if(i == 1){
                 await File.AppendAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}dafnyOutput_{index}.txt", "--VAC TEST--\n"+response + "\n------\n");
@@ -1202,8 +1203,8 @@ public async Task<bool>writeOutputs(int index)
       var request = requestList[i];
       var position = dafnyVerifier.requestToPostConditionPosition[request];
       var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-      var output = dafnyVerifier.dafnyOutput[request];
-      var response = output.Response;
+      var output = dafnyVerifier.dafnyOutput[request].ResponseList[0];
+      var response = output.Response.ToStringUtf8();
       if (DafnyOptions.O.HoleEvaluatorCreateAuxFiles){
               if(i == 1){
                 File.AppendAllTextAsync($"{DafnyOptions.O.HoleEvaluatorWorkingDirectory}dafnyOutput_{index}.txt", "--VAC TEST--\n"+response + "\n------\n");
@@ -1221,8 +1222,8 @@ public async Task<bool>writeOutputs(int index)
     var request = dafnyVerifier.requestsList[i].First();
       var position = dafnyVerifier.requestToPostConditionPosition[request];
       var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-      var output = dafnyVerifier.dafnyOutput[request];
-      var response = output.Response;
+      var output = dafnyVerifier.dafnyOutput[request].ResponseList[0];
+      var response = output.Response.ToStringUtf8();
       var filePath = output.FileName;
       // var startTime = output.StartTime;
       var execTime = output.ExecutionTimeInMs;
@@ -1236,8 +1237,8 @@ public async Task<bool>writeOutputs(int index)
     var request = dafnyVerifier.requestsList[i].Last();
       var position = dafnyVerifier.requestToPostConditionPosition[request];
       var lemmaStartPosition = dafnyVerifier.requestToLemmaStartPosition[request];
-      var output = dafnyVerifier.dafnyOutput[request];
-      var response = output.Response;
+      var output = dafnyVerifier.dafnyOutput[request].ResponseList[0];
+      var response = output.Response.ToStringUtf8();
       var filePath = output.FileName;
       // var startTime = output.StartTime;
       var execTime = output.ExecutionTimeInMs;
